@@ -6,6 +6,15 @@
 
 > 听懂每一句，唱活每一首。
 
+## 微信小程序改造入口
+
+本目录是原 TME AI Hackathon 项目的微信小程序改造副本，目标为「与 AI 共生」2026 微信小程序开发大赛。
+新对话请先阅读 [AGENTS.md 第 0 节](./AGENTS.md#0-当前工作迁移为微信小程序交接基线-2026-10-14)：其中保存了赛事背景、用户已确认的信息、仓库/部署隔离要求、建议技术方向和待办验收清单，无需让用户重新说明背景。
+
+截至 2026-10-14，已将本目录独立 Git 的 origin 绑定到 `https://github.com/AnthonyDeng121/VerseViva-WeChat.git`，尚未推送代码；没有小程序 AppID/备案，小程序代码尚未开始实现。
+建议新增 Taro + React + TypeScript 客户端并复用 FastAPI 分析后端，最终框架与功能裁剪仍待落地确认。注册与参赛提交当前后置，技术开发可先独立推进。
+下文描述的是继承的 Web Demo，不代表微信版已实现或部署；本项目不得写入原工作树、向原 VerseViva 远程推送，或自动覆盖原线上服务。
+
 产品与实现边界以 [AGENTS.md](./AGENTS.md) 为准。主歌词界面只显示 `×`、`‿`、合并桥等字符标记，中文解释与发音动作放在句子展开详情中；重叠人声默认使用左右并列的主 Vocal / 次 Vocal 双轨歌词展示。双轨只是教学视图，底层允许多 Vocal Part、多 Take 叠录，且每条 Take 可独立调节前后偏移和音量。项目不提取或展示音高、音符、音域与音准评分。
 
 当前产品闭环是：看懂发音处理 → 分清 Vocal 层次 → 逐句跟唱和诊断 → 分轨录制重叠人声 → 同步回放 → 记住真实改善。VerseViva 不承诺把任意混合人声自动分离成独立主唱与和声，也不做完整 DAW；Hero Song 的声部边界首先采用人工校对，自动模型结果必须标明为候选。
@@ -31,14 +40,14 @@
 在 PowerShell 中进入项目，再打开 WSL：
 
 ```powershell
-Set-Location 'D:\0Desktop2\项目\VerseViva'
+Set-Location 'D:\0Desktop2\项目\VerseViva-Wechat'
 wsl -d Ubuntu
 ```
 
 以下命令在 WSL 中执行：
 
 ```bash
-cd '/mnt/d/0Desktop2/项目/VerseViva'
+cd '/mnt/d/0Desktop2/项目/VerseViva-Wechat'
 
 python3.11 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip setuptools wheel
@@ -140,7 +149,7 @@ npm run dev
 先构建前端：
 
 ```powershell
-cd D:\0Desktop2\项目\VerseViva\web
+cd D:\0Desktop2\项目\VerseViva-Wechat\web
 npm.cmd install
 npm.cmd run build
 ```
@@ -148,7 +157,7 @@ npm.cmd run build
 然后从仓库根目录启动统一 Web 服务：
 
 ```powershell
-cd D:\0Desktop2\项目\VerseViva
+cd D:\0Desktop2\项目\VerseViva-Wechat
 python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
 ```
 
