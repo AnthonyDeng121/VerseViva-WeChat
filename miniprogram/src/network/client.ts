@@ -17,7 +17,7 @@ export type Operation<T> = { promise: Promise<T>; abort(): void };
 export type Credentials = { ownerId: string; accessToken: string; expiresAtMs: number };
 export type AuthProvider = {
   current(): Credentials | null;
-  // The future wx.login implementation supplies this; no AppSecret belongs here.
+  // The wx.login session manager supplies this; no AppSecret belongs here.
   refresh(): Promise<Credentials>;
 };
 export type WireResponse = { status: number; data?: unknown; tempFilePath?: string };

@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = 100 * 1024 * 1024
     max_recording_size_bytes: int = 100 * 1024 * 1024
     auto_run_analysis_pipeline: bool = True
+    wechat_login_enabled: bool = False
+    wechat_app_id: str = ""
+    wechat_app_secret: SecretStr | None = None
+    wechat_login_timeout_seconds: float = Field(default=10, gt=0, le=30)
+    wechat_token_ttl_seconds: int = Field(default=7200, ge=60, le=86400)
     demucs_executable: Path = Path(".venv-demucs/bin/demucs")
     demucs_model: str = "htdemucs"
     whisperx_executable: Path = Path(".venv-whisperx/bin/whisperx")

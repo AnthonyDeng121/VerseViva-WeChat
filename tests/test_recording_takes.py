@@ -16,7 +16,8 @@ def take_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("VERSEVIVA_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("VERSEVIVA_MAX_RECORDING_SIZE_BYTES", "64")
     get_settings.cache_clear()
-    song_id = "song_0123456789abcdef0123456789abcdef"
+    # Shared practice reference: private-song ownership is tested separately.
+    song_id = "song_00000000000000000000000000000003"
     ProfileStore(tmp_path).save(make_profile().model_copy(update={"song_id": song_id}))
     with TestClient(app) as client:
         yield client, tmp_path, song_id

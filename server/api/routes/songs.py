@@ -10,17 +10,14 @@ from server.models.song import AnalysisJob, AnalysisStage, AnalysisStatus, SongP
 from server.pipelines.song_analysis import build_default_pipeline
 from server.services.anonymous_session import session_id
 from server.services.language import add_pronunciation_guides
+from server.services.song_access import PUBLIC_HERO_SONG_IDS
+from server.services.song_access import require_song_access as _require_song_access
 from server.storage.job_store import JobStore
 from server.storage.practice_store import PracticeStore
 from server.storage.profile_store import ProfileStore
 from server.storage.take_store import TakeStore
 
 router = APIRouter()
-PUBLIC_HERO_SONG_IDS = {
-    "song_00000000000000000000000000000003",
-    "song_00000000000000000000000000000004",
-    "song_00000000000000000000000000000005",
-}
 CHUNK_SIZE = 1024 * 1024
 ALLOWED_CONTENT_TYPES = {
     ".mp3": {"audio/mpeg", "audio/mp3", "application/octet-stream"},
@@ -307,14 +304,6 @@ async def get_song_audio(song_id: str, asset: str, request: Request) -> FileResp
     if not source.is_file():
         raise HTTPException(status_code=404, detail="Audio asset not found")
     return FileResponse(source)
-
-
-def _require_song_access(song_id: str, request: Request) -> None:
-    if song_id in PUBLIC_HERO_SONG_IDS:
-        return
-    settings = get_settings()
-    if not JobStore(settings.data_dir).owns_song(song_id, session_id(request)):
-        raise HTTPException(status_code=404, detail="Song profile not found")
 
 
 def _with_queue_position(job: AnalysisJob, request: Request) -> AnalysisJob:

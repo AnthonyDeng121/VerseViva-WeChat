@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDidHide, useDidShow, useUnload } from '@tarojs/taro';
 import Taro from '@tarojs/taro';
+import { useAuth } from '../auth';
 import type { AnalysisJob } from '../../../shared/songTypes';
 import { apiClient, ApiError, friendlyError } from './index';
 import { VerseVivaApi, taskFinished, type Attempt, type TaskRef } from './api';
@@ -25,7 +26,7 @@ export function useTask(ref: TaskRef | null) {
   useDidShow(() => setPageVisible(true));
   useDidHide(() => setPageVisible(false));
   useUnload(() => poller?.dispose());
-  const owner = apiClient.currentOwner();
+  const owner = useAuth().ownerId;
   useEffect(() => {
     setValue(null); setError(''); setInterrupted(false);
     if (!ref || !owner) {

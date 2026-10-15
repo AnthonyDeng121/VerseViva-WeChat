@@ -8,7 +8,10 @@ from pathlib import Path
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
+
+from server.config import get_settings
+from server.storage.wechat_store import WeChatIdentityStore
 
 COOKIE_NAME = "verseviva_session"
 COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
@@ -45,12 +48,36 @@ class AnonymousSessionMiddleware(BaseHTTPMiddleware):
         self.secure = secure
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        authorization = request.headers.get("authorization")
+        if authorization is not None:
+            settings = get_settings()
+            parts = authorization.split()
+            owner_id = None
+            if settings.wechat_login_enabled and len(parts) == 2 and parts[0].lower() == "bearer":
+                owner_id = WeChatIdentityStore(settings.data_dir).resolve(
+                    parts[1], settings.wechat_app_id
+                )
+            if owner_id is None:
+                return JSONResponse(
+                    {"detail": "登录已过期或无效，请重新登录。"},
+                    status_code=401,
+                    headers={"Cache-Control": "no-store", "WWW-Authenticate": "Bearer"},
+                )
+            # Bearer takes precedence: never replace it with an anonymous Cookie.
+            request.state.session_id = owner_id
+            request.state.auth_type = "wechat"
+            response = await call_next(request)
+            response.headers["Cache-Control"] = "no-store"
+            return response
         raw = request.cookies.get(COOKIE_NAME)
         token = self._valid_token(raw)
         if token is None:
             token = secrets.token_urlsafe(32)
         request.state.session_id = "session_" + hashlib.sha256(token.encode()).hexdigest()
+        request.state.auth_type = "web_anonymous"
         response = await call_next(request)
+        if request.url.path.startswith(get_settings().api_prefix + "/auth/"):
+            return response
         # Re-issue on every response so cookies created before an HTTPS/configuration
         # upgrade acquire the current security attributes without changing identity.
         signature = hmac.new(self.secret, token.encode(), hashlib.sha256).hexdigest()

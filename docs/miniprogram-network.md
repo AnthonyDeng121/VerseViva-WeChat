@@ -30,16 +30,16 @@ TARO_APP_API_ORIGIN=https://你的微信版独立后端域名
 在微信公众平台为真实后端配置 request、uploadFile、downloadFile 合法域名，直接使用最终域名，不依赖重定向。
 本轮未获得微信版独立域名、未改公众平台配置、未部署服务器。开发工具关闭域名检查不能替代这项验收。
 
-## 登录续期只是可接入的契约
+## 登录续期已接入微信会话管理
 
 `apiClient.configureAuth(provider)` 的 `current()` 返回可信登录流程产生的
 `{ ownerId, accessToken, expiresAtMs }`；`refresh()` 应更新 provider 中的当前凭证后再返回。
 提前 30 秒检查过期；多个同时失败的请求共用一个 refresh；迟到的旧 Token 401 复用已刷新的凭证。
 账号变化会使旧响应失效，续期失败不会无限重试。Token 不写入任务记录，不输出日志，不发往第三方资源域名。
 
-实际 `wx.login → code2Session → 业务 Token` 及后端 Bearer 鉴权属于清单第 3 项，**尚未实现**。
-当前后端仍是 Web 匿名 Cookie 身份，不能直接设置一个客户端 Token 当作已登录，也不自动模拟或接管 Cookie。
-默认没有 AuthProvider，所有私有操作在发送前拒绝。`session_id=miniprogram` 只满足旧表单要求，绝不是授权身份。
+第三项已实现 `wx.login → code2Session → 业务 Token` 和后端 Bearer/Cookie 兼容，详见 [微信身份说明](miniprogram-auth.md)。
+会话管理器作为 AuthProvider 注册；没有取得可信凭证时，所有私有操作在发送前拒绝。`session_id=miniprogram` 只满足旧表单要求，绝不是授权身份。
+当前后端微信凭证未配置，仍未做真实微信换码/真机联调，不能直接设置一个客户端 Token 假装已登录，也不模拟或接管 Cookie。
 只有 health 和白名单中的公共 Hero Profile 可以匿名请求。
 
 ## 后台任务与恢复
@@ -55,7 +55,7 @@ App 前后台由 `app.tsx` 绑定；页面 show/hide/unload 通过 `useTask` 绑
 歌曲失败重试使用现有 retry；Practice 失败或任务失踪时，用户明确重试才发起 force 分析。
 `failed`、`insufficient_data` 均是终态，但不是可靠成功，不在此层累加 Memory。
 
-目前尚无登录入口、上传选歌入口和录音入口；页面进度路径在可信登录接入后才能做真实私有任务验收。
+首页已提供登录入口；上传选歌和录音入口尚未实现。任务路径已接入身份变化通知，仍需独立后端与真实登录配置后做私有任务验收。
 文件上传函数和后台短请求接口已备好，不代表录音/分析闭环完成。
 歌曲分析上传仍沿用后端 MP3/WAV/FLAC 扩展名校验；任意歌曲选择入口的临时文件重命名/选择适配后续实现，本轮优先处理 Take 临时文件。
 

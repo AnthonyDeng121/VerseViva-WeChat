@@ -1,18 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Text, View } from '@tarojs/components';
 import { useDidShow, useRouter } from '@tarojs/taro';
 import { apiClient, friendlyError } from '../../network';
 import type { TaskRef } from '../../network/api';
 import { pendingTasks, songApi, useTask } from '../../network/useTask';
+import { useAuth } from '../../auth';
 
 export default function Practice() {
   const { params } = useRouter();
+  const owner = useAuth().ownerId;
   const [restored, setRestored] = useState<TaskRef | null>(null);
-  useDidShow(() => {
-    const owner = apiClient.currentOwner();
+  const restore = () => {
     const saved = owner ? pendingTasks.read(owner) : [];
     setRestored(saved[saved.length - 1] ?? null);
-  });
+  };
+  useDidShow(restore);
+  useEffect(restore, [owner]);
   const task = useMemo<TaskRef | null>(() => {
     if (params.jobId && /^[a-zA-Z0-9_-]+$/.test(params.jobId)) return { kind: 'song', id: params.jobId };
     if (params.takeId && /^[a-zA-Z0-9_-]+$/.test(params.takeId)) return { kind: 'practice', id: params.takeId };

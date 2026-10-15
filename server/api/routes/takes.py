@@ -21,6 +21,7 @@ from server.services.anonymous_session import session_id as request_session_id
 from server.services.language import supports_language_coaching
 from server.services.mixdown import render_mixdown
 from server.services.practice.service import analyze_practice_take
+from server.services.song_access import require_song_access as _require_song_access
 from server.storage.practice_store import PracticeStore
 from server.storage.profile_store import ProfileStore
 from server.storage.take_store import TakeStore
@@ -116,6 +117,7 @@ async def upload_take(
 ) -> RecordingTake:
     settings = get_settings()
     session_id = request_session_id(request)
+    _require_song_access(song_id, request)
     profile = ProfileStore(settings.data_dir).get(song_id)
     if profile is None:
         raise HTTPException(status_code=404, detail="Song profile not found")
@@ -233,6 +235,7 @@ async def list_song_takes(
     song_id: str,
     session_id: str | None = Query(default=None),
 ) -> list[RecordingTake]:
+    _require_song_access(song_id, request)
     settings = get_settings()
     if ProfileStore(settings.data_dir).get(song_id) is None:
         raise HTTPException(status_code=404, detail="Song profile not found")
@@ -249,6 +252,7 @@ async def download_song_mixdown(
     accompaniment_volume: float = Query(default=0.55, ge=0, le=1),
     voice_volume: float = Query(default=1, ge=0, le=1),
 ) -> FileResponse:
+    _require_song_access(song_id, request)
     settings = get_settings()
     profile = ProfileStore(settings.data_dir).get(song_id)
     if profile is None:
@@ -423,6 +427,7 @@ async def list_practice_attempts(
     song_id: str,
     session_id: str = Query(...),
 ) -> list[PracticeAttempt]:
+    _require_song_access(song_id, request)
     settings = get_settings()
     if ProfileStore(settings.data_dir).get(song_id) is None:
         raise HTTPException(status_code=404, detail="Song profile not found")
