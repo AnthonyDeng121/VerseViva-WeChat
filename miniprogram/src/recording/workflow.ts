@@ -46,8 +46,8 @@ export class PracticeWorkflow {
       const take = await operation.promise;
       if (!this.valid(generation)) return;
       this.checkpoint = { takeId: take.takeId, songId: clip.selection.songId, mode };
-      this.dependencies.remember(this.owner!, this.checkpoint);
       this.update({ takeId: take.takeId });
+      this.dependencies.remember(this.owner!, this.checkpoint);
       await this.continue(generation);
     } catch (error) { if (this.valid(generation)) this.update({ phase: 'error', error: friendlyError(error) }); }
   }

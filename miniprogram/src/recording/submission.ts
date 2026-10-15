@@ -6,6 +6,7 @@ import { apiClient } from '../network';
 import { registerForegroundTask } from '../network/lifecycle';
 import { recorder } from './runtime';
 import { PracticeWorkflow } from './workflow';
+import { syncEvidence } from './sync';
 
 export const practiceApi = new VerseVivaApi(apiClient);
 let memoryRevision = 0;
@@ -17,7 +18,7 @@ const key = (owner: string) => `verseviva:submission:v1:${encodeURIComponent(VER
 export const submission = new PracticeWorkflow({
   currentOwner: () => authSession.getSnapshot().ownerId,
   upload: (clip) => practiceApi.uploadTake(clip.selection.songId, { ...clip.selection,
-    filePath: clip.filePath, durationSeconds: clip.durationSeconds, saveMode: 'overdub_append' }),
+    filePath: clip.filePath, durationSeconds: clip.durationSeconds, saveMode: 'overdub_append', syncEvidence: syncEvidence(clip) }),
   start: (takeId, force) => practiceApi.startPractice(takeId, force),
   attempt: (takeId) => practiceApi.attempt(takeId), remove: (takeId, preserve) => practiceApi.deleteTake(takeId, preserve),
   read: (owner) => Taro.getStorageSync(key(owner)),

@@ -10,7 +10,7 @@
     "test:shared": "node --test ../shared/audioTimeline.test.ts",
     "test:network": "node --experimental-transform-types --test tests/network.test.ts",
     "test:auth": "node --experimental-transform-types --test tests/auth.test.ts",
-    "test:audio": "node --experimental-transform-types --test tests/audio.test.ts",
+    "test:audio": "node --experimental-transform-types --test tests/audio.test.ts tests/player.test.ts",
     "test:recording": "node --experimental-transform-types --test tests/recording.test.ts"
   },
   "dependencies": {

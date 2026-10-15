@@ -8,7 +8,7 @@ import { interruptRecording, player } from './recording/runtime';
 
 export default function App({ children }: PropsWithChildren) {
   useLaunch(() => { void authSession.restore(); });
-  useDidShow(() => setAppForeground(true));
-  useDidHide(() => { setAppForeground(false); interruptRecording('切到后台后录音已中断，请重新录制。'); player.unlock('recording'); player.reset(); });
+  useDidShow(() => { player.setForeground(true); setAppForeground(true); });
+  useDidHide(() => { setAppForeground(false); interruptRecording('切到后台后录音已中断，请重新录制。'); player.setForeground(false); });
   return children;
 }

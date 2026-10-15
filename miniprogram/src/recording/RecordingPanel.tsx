@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Text, View } from '@tarojs/components';
-import Taro, { useDidHide } from '@tarojs/taro';
+import Taro, { useDidHide, useDidShow } from '@tarojs/taro';
 import { useAuth } from '../auth';
 import { friendlyError } from '../network';
 import { recorder, player, interruptRecording, useRecording } from './runtime';
@@ -14,8 +14,9 @@ export function RecordingPanel({ selection, language }: { selection: RecordingSe
   const [error, setError] = useState(''); const [elapsed, setElapsed] = useState(0);
   const working = ['uploading', 'analyzing', 'cleaning'].includes(work.phase);
   const recordingBusy = ['authorizing', 'preloading', 'countdown', 'starting', 'recording', 'stopping'].includes(recording.phase);
-  useDidHide(() => { interruptRecording('离开页面后录音已中断，请重新录制。'); player.unlock('recording'); player.reset(); });
-  useEffect(() => () => { interruptRecording('录音页面已关闭，请重新录制。'); }, []);
+  useDidShow(() => player.setForeground(true));
+  useDidHide(() => { interruptRecording('离开页面后录音已中断，请重新录制。'); player.setForeground(false); });
+  useEffect(() => () => { interruptRecording('录音页面已关闭，请重新录制。'); player.unlock('recording'); player.reset(); }, []);
   useEffect(() => {
     if (!working) return;
     const timer = setInterval(() => setElapsed(Math.max(0, Math.floor((Date.now() - work.startedAtMs) / 1000))), 1000);

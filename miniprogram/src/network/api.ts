@@ -1,4 +1,5 @@
 import type { AnalysisJob, SongProfile } from '../../../shared/songTypes';
+import type { SyncEvidence } from '../../../shared/recordingTypes';
 import { ApiClient, ApiError, type Operation } from './client.ts';
 
 export type Take = { takeId: string; songId: string; audioUrl: string; mimeType: string;
@@ -18,6 +19,7 @@ export type TakeUpload = {
   timelineStartSeconds: number; saveMode: 'practice_replace' | 'overdub_append';
   purpose?: 'guided_practice' | 'free_overdub'; vocalPartId?: string;
   durationSeconds?: number; latencyCompensationMs?: number; manualOffsetMs?: number;
+  syncEvidence?: SyncEvidence;
 };
 const id = (value: string) => {
   if (!/^[a-zA-Z0-9_-]+$/.test(value)) throw new ApiError('configuration', '内容标识无效。');
@@ -72,6 +74,7 @@ export class VerseVivaApi {
       manual_offset_ms: String(input.manualOffsetMs ?? 0),
     };
     if (input.vocalPartId) formData.vocal_part_id = input.vocalPartId;
+    if (input.syncEvidence) formData.sync_evidence = JSON.stringify(input.syncEvidence);
     if (input.durationSeconds !== undefined) formData.client_duration_seconds = String(input.durationSeconds);
     return this.client.upload<Take>(`/api/v1/songs/${id(songId)}/takes`,
       { filePath: input.filePath, formData, onProgress });

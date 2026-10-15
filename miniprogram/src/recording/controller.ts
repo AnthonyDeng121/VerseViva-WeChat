@@ -1,11 +1,13 @@
 import { ApiError, friendlyError } from '../network/client.ts';
+import type { SyncEvent } from '../../../shared/recordingTypes';
 
 export type RecordingSelection = {
   songId: string; trackSlotId: string; sentenceIds: string[]; vocalPartId?: string;
   selectionType: 'sentence' | 'segment'; selectionStartSeconds: number; selectionEndSeconds: number;
   timelineStartSeconds: number; latencyCompensationMs: number; manualOffsetMs: number;
+  calibrationStatus?: 'unverified' | 'user_calibrated';
 };
-export type RecordingEvent = { kind: string; atMs: number; positionSeconds?: number };
+export type RecordingEvent = SyncEvent;
 export type RecordingClip = { filePath: string; durationSeconds: number; ownerId: string;
   selection: RecordingSelection; events: RecordingEvent[] };
 export type RecordingSnapshot = {
@@ -21,7 +23,7 @@ export type RecorderDriver = {
 export class RecorderController {
   private driver?: RecorderDriver;
   private generation = 0;
-  private active: { ownerId: string; selection: RecordingSelection; started: boolean; discard: boolean;
+  private active: { ownerId: string; selection: RecordingSelection; started: boolean; referenceStarted: boolean; discard: boolean;
     expectedStop: boolean; originMs: number; events: RecordingEvent[] } | null = null;
   private timer?: ReturnType<typeof setTimeout>;
   private countdownResolve?: () => void;
@@ -44,11 +46,26 @@ export class RecorderController {
   private update(value: Partial<RecordingSnapshot>) {
     this.state = { ...this.state, ...value }; this.listeners.forEach((fn) => fn());
   }
-  private event(kind: string, positionSeconds?: number) {
+  private event(kind: SyncEvent['kind'], positionSeconds?: number) {
     if (this.active && this.active.events.length < 96) this.active.events.push({ kind,
       atMs: Math.max(0, this.now() - this.active.originMs), ...(positionSeconds !== undefined ? { positionSeconds } : {}) });
   }
-  evidence(kind: string, positionSeconds: number) { this.event(kind, positionSeconds); }
+  evidence(kind: SyncEvent['kind'], positionSeconds: number) { this.event(kind, positionSeconds); }
+  referenceStarted(positionSeconds: number) {
+    const active = this.active;
+    if (!active || !active.started || active.discard || active.referenceStarted) return;
+    if (!Number.isFinite(positionSeconds) || Math.abs(positionSeconds - active.selection.selectionStartSeconds) > 0.5) {
+      this.interrupt('参考音频起点未确认，请重新录制。'); return;
+    }
+    active.referenceStarted = true; this.event('reference_playing', positionSeconds);
+    this.clearTimer();
+    this.timer = this.delay(Math.max(0, active.selection.selectionEndSeconds - positionSeconds) * 1000, () => this.stop());
+  }
+  referenceEnded(positionSeconds: number) {
+    if (!this.active || this.state.phase !== 'recording') return;
+    if (positionSeconds >= this.active.selection.selectionEndSeconds - 0.25) this.stop();
+    else this.interrupt('参考音频提前结束，请重新录制。');
+  }
   private attachDriver() {
     if (this.driver) return;
     this.driver = this.dependencies.driver();
@@ -57,18 +74,16 @@ export class RecorderController {
       if (!active || active.discard || this.state.phase !== 'starting') { this.driver?.stop(); return; }
       active.started = true; this.event('recorder_started');
       this.update({ phase: 'recording' });
+      this.clearTimer(); this.timer = this.delay(3000, () => this.interrupt('参考播放未能及时启动，请重新录制。'));
       try { this.event('reference_play_requested'); this.dependencies.playReference(); }
       catch { this.interrupt('参考播放未能开始，请重新录制。'); return; }
       if (this.active !== active || active.discard) return;
-      this.clearTimer();
-      this.timer = this.delay((active.selection.selectionEndSeconds - active.selection.selectionStartSeconds) * 1000,
-        () => this.stop());
     });
     this.driver.onStop((result) => {
       this.clearTimer();
       const active = this.active; this.active = null;
       this.dependencies.stopReference();
-      if (!active || active.discard || !active.started || !active.expectedStop
+      if (!active || active.discard || !active.started || !active.referenceStarted || !active.expectedStop
         || active.ownerId !== this.dependencies.owner() || result.duration < 250 || !result.tempFilePath
         || result.fileSize <= 0 || result.fileSize > 100 * 1024 * 1024) {
         if (result.tempFilePath) void this.dependencies.remove(result.tempFilePath);
@@ -113,7 +128,7 @@ export class RecorderController {
         if (!valid()) return;
       }
       this.attachDriver();
-      this.active = { ownerId, selection: { ...selection, sentenceIds: [...selection.sentenceIds] }, started: false, discard: false,
+      this.active = { ownerId, selection: { ...selection, sentenceIds: [...selection.sentenceIds] }, started: false, referenceStarted: false, discard: false,
         expectedStop: false, originMs: this.now(), events: [] };
       this.event('recorder_start_requested'); this.update({ phase: 'starting', countdown: 0 });
       this.timer = this.delay(5000, () => this.interrupt('录音启动超时，请重新尝试。'));

@@ -4,12 +4,13 @@ import { RecorderController, type RecorderDriver, type RecordingSelection, type 
 import { PracticeWorkflow, type Checkpoint } from '../src/recording/workflow.ts';
 import { ApiError } from '../src/network/client.ts';
 import type { Attempt } from '../src/network/api.ts';
+import { syncEvidence } from '../src/recording/sync.ts';
 
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 const selection: RecordingSelection = { songId: 'song_' + 'a'.repeat(32), sentenceIds: ['sentence_1'],
   trackSlotId: 'primary:range:s:s:1', selectionType: 'sentence', selectionStartSeconds: 1,
   selectionEndSeconds: 3, timelineStartSeconds: 1, latencyCompensationMs: 0, manualOffsetMs: 0 };
-function setup(options: { authorize?: () => Promise<void>; prepare?: () => Promise<void> } = {}) {
+function setup(options: { authorize?: () => Promise<void>; prepare?: () => Promise<void>; referenceStarts?: boolean } = {}) {
   let start!: () => void; let stop!: Parameters<RecorderDriver['onStop']>[0];
   let interrupt!: () => void; let error!: () => void;
   let starts = 0; let plays = 0; let owner = 'alice';
@@ -18,7 +19,8 @@ function setup(options: { authorize?: () => Promise<void>; prepare?: () => Promi
     driver: () => ({ start() { starts += 1; }, stop() {}, onStart: (fn) => { start = fn; },
       onStop: (fn) => { stop = fn; }, onError: (fn) => { error = fn; }, onInterruption: (fn) => { interrupt = fn; } }),
     owner: () => owner, authorize: options.authorize ?? (async () => {}),
-    prepare: options.prepare ?? (async () => {}), playReference() { plays += 1; }, stopReference() {},
+    prepare: options.prepare ?? (async () => {}), playReference() { plays += 1;
+      if (options.referenceStarts !== false) controller.referenceStarted(selection.selectionStartSeconds); }, stopReference() {},
     async remove(path) { removed.push(path); },
     delay(_, fn) { timers.set(++serial, fn); return serial as unknown as ReturnType<typeof setTimeout>; },
     cancel(handle) { timers.delete(handle as unknown as number); },
@@ -48,6 +50,22 @@ test('permission refusal and preload failure never call native start', async () 
     await h.controller.start(selection); assert.equal(h.starts(), 0);
     assert.equal(h.controller.getSnapshot().phase, 'error');
   }
+});
+test('actual reference start is required; missing playback times out and discards output', async () => {
+  const h = setup({ referenceStarts: false }); await requestStart(h); h.start();
+  await h.tick(); h.stop();
+  assert.equal(h.controller.getSnapshot().phase, 'interrupted');
+  assert.equal(h.controller.getSnapshot().clip, null);
+});
+test('sync evidence preserves callback observations separately from unverified device latency', async () => {
+  const h = setup(); await requestStart(h); h.start(); h.controller.stop(); h.stop();
+  const evidence = syncEvidence(h.controller.getSnapshot().clip!);
+  assert.equal(evidence.calibrationStatus, 'unverified');
+  assert.equal(evidence.calibratedDeviceLatencyMs, 0);
+  assert.equal(evidence.events[3].positionSeconds, selection.selectionStartSeconds);
+  assert.deepEqual(evidence.events.map((event) => event.kind), ['recorder_start_requested',
+    'recorder_started', 'reference_play_requested', 'reference_playing', 'recorder_stop_requested', 'recorder_stopped']);
+  h.controller.discard();
 });
 test('hide during countdown prevents start; system interruption discards late partial onStop', async () => {
   const h = setup(); const start = h.controller.start(selection); await flush();

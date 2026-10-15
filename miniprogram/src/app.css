@@ -9,3 +9,4 @@ page { background: #f7f4ed; color: #243a32; font-size: 30px; }
 button { margin-top: 24px; background: #2c6951; color: #fff; font-size: 30px; border-radius: 16px; }
 button::after { border: 0; }
 .privacy-mask { position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,.6); padding: 80px 32px; display: flex; align-items: center; }
+.lyric-active { background: #d6eadc; border-radius: 12px; padding: 12px; }

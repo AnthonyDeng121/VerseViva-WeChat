@@ -32,10 +32,22 @@ export const recorder = new RecorderController({
     if (preparing === operation) preparing = null;
     try { await player.load(lease, selection.selectionStartSeconds, 'recording'); }
     catch (error) { lease.release(); player.unlock('recording'); throw error; }
+    await player.seek(selection.selectionStartSeconds, 'recording');
   },
   playReference: () => player.play('recording'),
   stopReference() { preparing?.abort(); preparing = null; player.unlock('recording'); player.reset(); },
   remove: (path) => taroTransport.removeTempFile(path),
+});
+player.onEvent((event) => {
+  if (recorder.getSnapshot().phase !== 'recording') return;
+  if (event.kind === 'playing') recorder.referenceStarted(event.positionSeconds);
+  else if (event.kind === 'ended') recorder.referenceEnded(event.positionSeconds);
+  else {
+    recorder.evidence(`reference_${event.kind}`, event.positionSeconds);
+    if (['waiting', 'error', 'pause', 'stop', 'seek'].includes(event.kind)) {
+      recorder.interrupt('录音期间参考播放发生中断，请重新录制。');
+    }
+  }
 });
 let owner: string | null = null;
 authSession.subscribe(() => {

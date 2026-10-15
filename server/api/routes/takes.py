@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
+from pydantic import ValidationError
 from starlette.background import BackgroundTask
 
 from server.config import get_settings
@@ -14,6 +15,7 @@ from server.models.recording import (
     RecordingSelectionType,
     RecordingTake,
     RecordingTakeUpdate,
+    SyncEvidence,
     TakePurpose,
     TakeSaveMode,
 )
@@ -115,10 +117,21 @@ async def upload_take(
     client_duration_seconds: float | None = Form(default=None),
     latency_compensation_ms: float = Form(default=0),
     manual_offset_ms: float = Form(default=0),
+    sync_evidence: str | None = Form(default=None),
 ) -> RecordingTake:
     settings = get_settings()
     session_id = request_session_id(request)
     _require_song_access(song_id, request)
+    evidence = None
+    if sync_evidence is not None:
+        try:
+            if len(sync_evidence) > 16384:
+                raise ValueError("oversize evidence")
+            evidence = SyncEvidence.model_validate_json(sync_evidence)
+            if evidence.calibrated_device_latency_ms != latency_compensation_ms:
+                raise ValueError("calibration mismatch")
+        except (ValidationError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail="Invalid recording sync evidence") from exc
     profile = ProfileStore(settings.data_dir).get(song_id)
     if profile is None:
         raise HTTPException(status_code=404, detail="Song profile not found")
@@ -218,6 +231,7 @@ async def upload_take(
             client_duration_seconds=client_duration_seconds,
             latency_compensation_ms=latency_compensation_ms,
             manual_offset_ms=manual_offset_ms,
+            sync_evidence=evidence,
         )
         TakeStore(settings.data_dir).add(take)
         return take
