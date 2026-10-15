@@ -1,0 +1,32 @@
+# Same-host alternative to compose.wechat.yaml; do not merge the two files.
+# The existing Caddy owns ports 80/443. Add its route only after release review.
+name: verseviva-wechat
+services:
+  app:
+    build: .
+    image: verseviva-wechat-app:local
+    restart: unless-stopped
+    env_file: .env.wechat
+    command: ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    mem_limit: 3g
+    cpus: 1.0
+    volumes:
+      - wechat-data:/app/data
+      - wechat-model-cache:/root/.cache
+    expose: ["8000"]
+    networks:
+      default: {}
+      ingress:
+        aliases: [verseviva-wechat-api]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+networks:
+  ingress:
+    external: true
+    name: ${WECHAT_INGRESS_NETWORK:?Set the existing Caddy Docker network}
+volumes:
+  wechat-data:
+  wechat-model-cache:

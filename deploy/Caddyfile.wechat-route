@@ -1,0 +1,6 @@
+# Append to the existing ingress configuration after backing it up and
+# validating the combined configuration. Do not replace the original sites.
+wechat-api.verseviva.top {
+    encode zstd gzip
+    reverse_proxy verseviva-wechat-api:8000
+}
