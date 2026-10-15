@@ -133,19 +133,27 @@ class MixJobs:
             for row in rows:
                 if take_id not in MixRequest.model_validate_json(row["request"]).take_ids:
                     continue
+                self._invalidate(connection, MixJob.model_validate_json(row["payload"]))
+
+    def invalidate_song(self, owner: str, song_id: str):
+        with self.connect() as connection:
+            rows = connection.execute("SELECT payload FROM mix_jobs WHERE owner=?", (owner,))
+            for row in rows.fetchall():
                 job = MixJob.model_validate_json(row["payload"])
-                if job.status in {"failed", "stale"}:
-                    continue
-                queued = job.status == "queued"
-                job.status = "stale"
-                job.error = "录音已修改或删除，请重新生成。"
-                self.save(connection, job)
-                if job.job_id not in self.tasks:
-                    shutil.rmtree(self.output(job.job_id).parent, ignore_errors=True)
-                elif queued:
-                    self.tasks[job.job_id].cancel()
-                # A running ffmpeg gets no new download authorization. Its output
-                # is discarded after the bounded render returns, never published.
+                if job.song_id == song_id:
+                    self._invalidate(connection, job)
+
+    def _invalidate(self, connection, job: MixJob):
+        queued = job.status == "queued"
+        job.status = "stale"
+        job.error = "录音已修改或删除，请重新生成。"
+        self.save(connection, job)
+        if job.job_id not in self.tasks:
+            shutil.rmtree(self.output(job.job_id).parent, ignore_errors=True)
+        elif queued:
+            self.tasks[job.job_id].cancel()
+        # Even an already-stale cache may still contain audio. Delete completed
+        # files now; a running render discards its output when it returns.
 
     def start(self, owner: str, song_id: str, request: MixRequest) -> MixJob:
         if self.closing:

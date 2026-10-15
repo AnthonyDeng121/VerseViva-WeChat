@@ -96,6 +96,72 @@ def test_delete_input_invalidates_even_cached_audio(auth_client, monkeypatch):  
     assert client.get(f"/api/v1/mix-jobs/{job_id}/audio", headers=alice).status_code == 409
 
 
+@pytest.mark.parametrize("already_stale", [False, True])
+def test_song_deletion_removes_ready_or_stale_mix_and_preserves_other_owner(
+    auth_client, monkeypatch, already_stale,  # noqa: F811
+):
+    client, data, alice, song, take, _ = setup_mix(auth_client, monkeypatch)
+    job_id = start(client, alice, song, take).json()["jobId"]
+    assert wait(client, alice, job_id)["status"] == "ready"
+    output = client.app.state.mix_jobs.output(job_id)
+    if already_stale:
+        source = data / "takes" / take["takeId"] / "original.webm"
+        source.write_bytes(b"changed-audio-size")
+        assert wait(client, alice, job_id)["status"] == "stale"
+        assert output.exists()  # Reading stale metadata does not itself prune the file.
+    bob = bearer(login(client, "bob"))
+    bob_song = create_song(client, bob, data)["song_id"]
+    bob_take = upload_take(client, bob_song, bob).json()
+    bob_job = start(client, bob, bob_song, bob_take).json()["jobId"]
+    assert wait(client, bob, bob_job)["status"] == "ready"
+    assert client.delete(f"/api/v1/songs/{song}", headers=bob).status_code == 404
+    assert output.exists()
+    assert client.delete(f"/api/v1/songs/{song}", headers=alice).status_code == 204
+    assert not output.exists()
+    assert client.app.state.mix_jobs.output(bob_job).exists()
+    assert client.get(f"/api/v1/mix-jobs/{job_id}/audio", headers=alice).status_code == 404
+
+
+def test_take_deletion_prunes_previously_stale_mix(auth_client, monkeypatch):  # noqa: F811
+    client, data, alice, song, take, _ = setup_mix(auth_client, monkeypatch)
+    job_id = start(client, alice, song, take).json()["jobId"]
+    assert wait(client, alice, job_id)["status"] == "ready"
+    source = data / "takes" / take["takeId"] / "original.webm"
+    source.write_bytes(b"changed-audio-size")
+    assert wait(client, alice, job_id)["status"] == "stale"
+    assert client.delete(f"/api/v1/takes/{take['takeId']}", headers=alice).status_code == 204
+    assert not client.app.state.mix_jobs.output(job_id).exists()
+
+
+def test_song_deleted_during_render_discards_late_mix(auth_client, monkeypatch):  # noqa: F811
+    client, _, alice, song, take, _ = setup_mix(auth_client, monkeypatch)
+    entered, release = threading.Event(), threading.Event()
+
+    def render(**options):
+        entered.set()
+        assert release.wait(3)
+        options["output"].parent.mkdir(parents=True, exist_ok=True)
+        options["output"].write_bytes(b"ID3-late-private-audio")
+
+    monkeypatch.setattr("server.services.mix_jobs.render_mixdown", render)
+    service = client.app.state.mix_jobs
+    try:
+        job_id = start(client, alice, song, take).json()["jobId"]
+        assert entered.wait(1)
+        assert client.delete(f"/api/v1/songs/{song}", headers=alice).status_code == 204
+    finally:
+        release.set()
+    for _ in range(300):
+        task = service.tasks.get(job_id)
+        if task is None or task.done():
+            break
+        time.sleep(0.01)
+    else:
+        pytest.fail("deleted song mix render did not finish")
+    assert not service.output(job_id).exists()
+    assert client.get(f"/api/v1/mix-jobs/{job_id}/audio", headers=alice).status_code == 404
+
+
 def test_running_edit_never_publishes_old_audio_and_owner_queue_is_bounded(
     auth_client, monkeypatch,  # noqa: F811
 ):

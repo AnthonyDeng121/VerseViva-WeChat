@@ -194,6 +194,7 @@ async def cancel_analysis_job(job_id: str, request: Request) -> None:
         raise HTTPException(status_code=409, detail="Analysis job is no longer running")
     if not await request.app.state.analysis_queue.cancel(job_id):
         raise HTTPException(status_code=409, detail="Analysis job is no longer running")
+    request.app.state.mix_jobs.invalidate_song(owner_session, job.song_id)
     _delete_song_data(settings.data_dir, job, owner_session)
 
 
@@ -263,6 +264,7 @@ async def delete_song(song_id: str, request: Request) -> None:
     if job.status in {AnalysisStatus.queued, AnalysisStatus.processing}:
         raise HTTPException(status_code=409, detail="Song analysis is still running")
 
+    request.app.state.mix_jobs.invalidate_song(owner_session, job.song_id)
     _delete_song_data(settings.data_dir, job, owner_session)
 
 
