@@ -12,7 +12,8 @@
     "test:auth": "node --experimental-transform-types --test tests/auth.test.ts",
     "test:audio": "node --experimental-transform-types --test tests/audio.test.ts tests/player.test.ts",
     "test:recording": "node --experimental-transform-types --test tests/recording.test.ts",
-    "test:mix": "node --experimental-transform-types --test tests/mix.test.ts"
+    "test:mix": "node --experimental-transform-types --test tests/mix.test.ts",
+    "test:lyrics": "node --experimental-transform-types --test tests/lyrics.test.ts"
   },
   "dependencies": {
     "@tarojs/components": "4.3.0",

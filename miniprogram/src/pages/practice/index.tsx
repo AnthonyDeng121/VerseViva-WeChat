@@ -6,6 +6,7 @@ import type { TaskRef } from '../../network/api';
 import { pendingTasks, songApi, useTask } from '../../network/useTask';
 import { useAuth } from '../../auth';
 import { SongPractice } from './SongPractice';
+import { Feedback } from '../../lyrics/Feedback';
 
 export default function Practice() {
   const { params } = useRouter();
@@ -60,6 +61,7 @@ export default function Practice() {
         <Text className='card-title'>{cancelled ? '分析已取消' : value ? labels[value.status] : '查看分析进度'}</Text>
         {value && 'queue_position' in value && value.queue_position != null
           && <Text className='muted'>当前排队位次：{value.queue_position}</Text>}
+        {value && 'takeId' in value && <Feedback attempt={value} />}
         {!cancelled && error && <Text className='muted'>{error}</Text>}
         {actionError && <Text className='muted'>{actionError}</Text>}
         {!cancelled && apiClient.currentOwner() && (error || value?.status === 'failed')

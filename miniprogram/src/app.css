@@ -10,3 +10,16 @@ button { margin-top: 24px; background: #2c6951; color: #fff; font-size: 30px; bo
 button::after { border: 0; }
 .privacy-mask { position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,.6); padding: 80px 32px; display: flex; align-items: center; }
 .lyric-active { background: #d6eadc; border-radius: 12px; padding: 12px; }
+.lyric-row { margin-top: 28px; padding: 12px; border-radius: 16px; }
+.lyric-lane { padding: 20px; margin-top: 16px; border-left: 8px solid; border-radius: 12px; min-width: 0; }
+.lane-primary { border-color: #2c6951; background: #eef6ef; }
+.lane-secondary { border-color: #69559a; background: #f3eff9; }
+.lane-selected { outline: 2px solid #415c51; }
+.lane-label { display: block; font-weight: 700; margin-bottom: 12px; }
+.lyric-text, .lyric-original { display: block; line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.lyric-original { color: #57665f; margin-bottom: 12px; }
+.lyric-mark { color: #8b341c; font-weight: 700; padding: 8px 4px; }
+.hint-detail { background: #faf8f1; border-radius: 16px; padding: 20px; margin-top: 16px; overflow-wrap: anywhere; }
+.hint-button, .seek-button { font-size: 26px; line-height: 1.6; padding: 14px; white-space: normal; text-align: left; }
+.hint-button { background: #e2ece6; color: #243a32; margin-top: 12px; }
+.seek-button { background: transparent; color: #2c6951; margin-top: 0; }

@@ -1,10 +1,11 @@
+import { Lyrics } from '../../lyrics/Lyrics';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, Picker, Text, View } from '@tarojs/components';
 import { useAuth } from '../../auth';
 import { songApi } from '../../network/useTask';
 import { friendlyError } from '../../network';
 import type { SongProfile } from '../../../../shared/songTypes';
-import { buildTrackSlotId, lyricsForLane } from '../../../../shared/audioTimeline';
+import { buildTrackSlotId } from '../../../../shared/audioTimeline';
 import type { RecordingSelection } from '../../recording/controller';
 import { RecordingPanel } from '../../recording/RecordingPanel';
 import { player, usePlayer, useRecording } from '../../recording/runtime';
@@ -56,19 +57,16 @@ export function SongPractice({ songId }: { songId: string }) {
       <Input type='number' value={String(latency)} disabled={busy} onInput={(event) => {
         const value = Number(event.detail.value); if (Number.isFinite(value)) { setLatency(Math.max(-2000, Math.min(2000, value))); setCalibrated(true); }
       }} />
-      {profile.sentences.slice(start, end + 1).map((sentence) => <View key={sentence.id}
-        className={playback.phase === 'playing' && playback.songTimeSeconds !== null && playback.songTimeSeconds >= sentence.startSeconds && playback.songTimeSeconds < sentence.endSeconds ? 'lyric-active' : ''}
-        onClick={() => { if (!busy && playback.phase !== 'idle' && playback.songTimeSeconds !== null) {
-          const offset = playback.songTimeSeconds - playback.timeSeconds;
-          if (sentence.startSeconds >= offset) void player.seek(sentence.startSeconds - offset).catch(() => {});
-        } }}>
-        <Text className='description'>{lane === 'primary' ? lyricsForLane(sentence.lyrics, lane)
-          : profile.vocalParts.filter((part) => part.lane === 'secondary' && part.sentenceIds.includes(sentence.id)).map((part) => part.lyrics).join(' / ') || '本句无次声部'}</Text>
-        {lane === 'primary' && sentence.pronunciation && <Text className='muted'>{sentence.pronunciation.text}</Text>}
-      </View>)}
+      <Lyrics key={`${songId}:${owner}:${start}:${end}`} profile={profile} start={start} end={end} lane={lane}
+        time={playback.songTimeSeconds} onSeek={(seconds) => {
+          if (!busy && playback.phase !== 'idle' && playback.songTimeSeconds !== null) {
+            const offset = playback.songTimeSeconds - playback.timeSeconds;
+            if (seconds >= offset) void player.seek(seconds - offset).catch(() => {});
+          }
+        }} />
     </View>
     <ReferenceControls songId={songId} selection={selection} />
-    <RecordingPanel selection={selection} language={profile.language} />
+    <RecordingPanel selection={selection} language={profile.language} profile={profile} />
     <SavedTakes songId={songId} />
   </View>;
 }

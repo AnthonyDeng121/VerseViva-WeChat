@@ -13,7 +13,11 @@ export type Attempt = {
   takeId: string; attemptId?: string;
   status: 'processing' | 'analyzed' | 'failed' | 'insufficient_data';
   insufficientReason?: string | null;
-  recommendations?: { headline: string; observation: string; action: string }[];
+  songId?: string; trackSlotId?: string; sentenceIds?: string[];
+  issues?: { issueId: string; sentenceId: string; hintId: string; wordText: string; confidence: number; audibleEvidence: string[] }[];
+  comparison?: { result: string; lookbackAttemptCount?: number };
+  sentenceComparisons?: Record<string, { result: string; lookbackAttemptCount?: number }>;
+  recommendations?: { issueId?: string; headline: string; observation: string; action: string }[];
 };
 export type Memory = { totalAttempts: number; reliableAttempts: number;
   phenomena: { issueType: string; issueCount: number; recentIssueCount: number; trend: string }[] };

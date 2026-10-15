@@ -7,8 +7,10 @@ import { recorder, player, interruptRecording, useRecording } from './runtime';
 import { RecordingPrivacy } from './privacy';
 import { submission, useSubmission } from './submission';
 import type { RecordingSelection } from './controller';
+import type { SongProfile } from '../../../shared/songTypes';
+import { Feedback } from '../lyrics/Feedback';
 
-export function RecordingPanel({ selection, language }: { selection: RecordingSelection | null; language?: string | null }) {
+export function RecordingPanel({ selection, language, profile }: { selection: RecordingSelection | null; language?: string | null; profile?: SongProfile }) {
   const owner = useAuth().ownerId;
   const recording = useRecording(); const work = useSubmission();
   const [error, setError] = useState(''); const [elapsed, setElapsed] = useState(0);
@@ -53,9 +55,7 @@ export function RecordingPanel({ selection, language }: { selection: RecordingSe
     {work.phase === 'error' && work.takeId && <Button onClick={() => void submission.retry(true)}>重试处理</Button>}
     {work.phase === 'done' && <Text className='card-title'>{work.attempt?.status === 'failed' ? '本次分析未完成，请重新练习。'
       : work.attempt?.status === 'insufficient_data' ? '这次录音证据不足，请重新录制。' : work.mode === 'save_only' ? '录音已保存' : '处理完成，可在练习记忆中查看记录。'}</Text>}
-    {work.attempt?.recommendations?.map((item, index) => <View key={index}>
-      <Text className='card-title'>{item.headline}</Text><Text className='muted'>{item.observation}</Text><Text>{item.action}</Text>
-    </View>)}
+    {work.attempt && <Feedback attempt={work.attempt} profile={profile} />}
     <RecordingPrivacy />
   </View>;
 }
