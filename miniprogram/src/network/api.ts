@@ -1,12 +1,16 @@
 import type { AnalysisJob, SongProfile } from '../../../shared/songTypes';
 import { ApiClient, ApiError, type Operation } from './client.ts';
 
-export type Take = { takeId: string; songId: string; audioUrl: string; mimeType: string };
+export type Take = { takeId: string; songId: string; audioUrl: string; mimeType: string;
+  displayName?: string; trackSlotId?: string; sentenceIds?: string[]; gain?: number; muted?: boolean };
 export type Attempt = {
   takeId: string; attemptId?: string;
   status: 'processing' | 'analyzed' | 'failed' | 'insufficient_data';
   insufficientReason?: string | null;
+  recommendations?: { headline: string; observation: string; action: string }[];
 };
+export type Memory = { totalAttempts: number; reliableAttempts: number;
+  phenomena: { issueType: string; issueCount: number; recentIssueCount: number; trend: string }[] };
 export type TaskRef = { kind: 'song' | 'practice'; id: string };
 export type TakeUpload = {
   filePath: string; trackSlotId: string; selectionType: 'sentence' | 'segment';
@@ -89,6 +93,11 @@ export class VerseVivaApi {
   downloadTake(takeId: string, onProgress?: (percent: number) => void) {
     return this.client.download(`/api/v1/takes/${id(takeId)}/audio`, { onProgress });
   }
+  deleteTake(takeId: string, preserveAttempt = false) {
+    return this.client.request<void>('DELETE', `/api/v1/takes/${id(takeId)}?preserve_attempt=${preserveAttempt}`);
+  }
+  takes(songId: string) { return this.client.request<Take[]>('GET', `/api/v1/songs/${id(songId)}/takes`); }
+  memory() { return this.client.request<Memory>('GET', '/api/v1/practice/memory?session_id=miniprogram'); }
 }
 
 export function taskFinished(value: AnalysisJob | Attempt): boolean {

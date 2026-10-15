@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "dev:weapp": "taro build --type weapp --watch",
-    "build:weapp": "taro build --type weapp",
+    "build:weapp": "node scripts/build-weapp.cjs",
     "typecheck": "tsc --noEmit",
     "check:package": "node scripts/check-package.cjs",
     "test:shared": "node --test ../shared/audioTimeline.test.ts",
     "test:network": "node --experimental-transform-types --test tests/network.test.ts",
     "test:auth": "node --experimental-transform-types --test tests/auth.test.ts",
-    "test:audio": "node --experimental-transform-types --test tests/audio.test.ts"
+    "test:audio": "node --experimental-transform-types --test tests/audio.test.ts",
+    "test:recording": "node --experimental-transform-types --test tests/recording.test.ts"
   },
   "dependencies": {
     "@tarojs/components": "4.3.0",

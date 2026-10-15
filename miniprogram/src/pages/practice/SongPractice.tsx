@@ -1,0 +1,59 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Picker, Text, View } from '@tarojs/components';
+import { useAuth } from '../../auth';
+import { songApi } from '../../network/useTask';
+import { friendlyError } from '../../network';
+import type { SongProfile } from '../../../../shared/songTypes';
+import { buildTrackSlotId, lyricsForLane } from '../../../../shared/audioTimeline';
+import type { RecordingSelection } from '../../recording/controller';
+import { RecordingPanel } from '../../recording/RecordingPanel';
+import { useRecording } from '../../recording/runtime';
+import { SavedTakes } from '../../recording/SavedTakes';
+
+export function SongPractice({ songId }: { songId: string }) {
+  const owner = useAuth().ownerId; const recording = useRecording();
+  const [profile, setProfile] = useState<SongProfile | null>(null);
+  const [error, setError] = useState(''); const [revision, setRevision] = useState(0);
+  const [start, setStart] = useState(0); const [end, setEnd] = useState(0);
+  const [lane, setLane] = useState<'primary' | 'secondary'>('primary');
+  useEffect(() => {
+    let live = true; setProfile(null); setError(''); const operation = songApi.profile(songId);
+    void operation.promise.then((value) => { if (live) { setProfile(value); setStart(0); setEnd(0); } })
+      .catch((reason) => { if (live) setError(friendlyError(reason)); });
+    return () => { live = false; operation.abort(); };
+  }, [songId, owner, revision]);
+  const selection = useMemo<RecordingSelection | null>(() => {
+    if (!profile || start > end) return null;
+    const sentences = profile.sentences.slice(start, end + 1); if (!sentences.length) return null;
+    const ids = sentences.map((sentence) => sentence.id);
+    const parts = profile.vocalParts.filter((part) => part.lane === 'secondary' && part.sentenceIds.some((id) => ids.includes(id)));
+    if (lane === 'secondary' && !parts.length) return null;
+    return { songId, trackSlotId: buildTrackSlotId(lane, ids), sentenceIds: ids,
+      selectionType: ids.length === 1 ? 'sentence' : 'segment',
+      ...(lane === 'secondary' && parts.length === 1 ? { vocalPartId: parts[0].id } : {}),
+      selectionStartSeconds: sentences[0].startSeconds,
+      selectionEndSeconds: Math.max(sentences[sentences.length - 1].endSeconds,
+        ...(lane === 'secondary' ? parts.map((part) => part.endSeconds) : [])),
+      timelineStartSeconds: sentences[0].startSeconds, latencyCompensationMs: 0, manualOffsetMs: 0 };
+  }, [profile, songId, start, end, lane]);
+  const busy = !['idle', 'preview', 'error', 'interrupted'].includes(recording.phase);
+  if (!profile) return <View className='card'><Text>{error || '正在读取歌曲…'}</Text>
+    {error && <Button onClick={() => setRevision((value) => value + 1)}>重新加载</Button>}</View>;
+  const labels = profile.sentences.map((sentence, index) => `${index + 1}. ${sentence.lyrics}`);
+  return <View>
+    <Text className='title'>{profile.title}</Text>
+    {profile.analysis.lyricsSource === 'asr' && <Text className='muted'>歌词来自自动识别，可能存在较大误差。</Text>}
+    <View className='card'>
+      <Picker mode='selector' range={labels} value={start} disabled={busy} onChange={(event) => { const value = Number(event.detail.value); setStart(value); if (value > end) setEnd(value); }}><Text>起始句：{start + 1}（点击选择）</Text></Picker>
+      <Picker mode='selector' range={labels} value={end} disabled={busy} onChange={(event) => { const value = Number(event.detail.value); setEnd(value); if (value < start) setStart(value); }}><Text>结束句：{end + 1}（点击选择）</Text></Picker>
+      <Button disabled={busy} onClick={() => setLane(lane === 'primary' ? 'secondary' : 'primary')}>{lane === 'primary' ? '主唱 · 点击切换次声部' : '次声部 · 点击切换主唱'}</Button>
+      {!selection && <Text className='muted'>当前范围没有对应次声部，请选择其他句子或主唱。</Text>}
+      {profile.sentences.slice(start, end + 1).map((sentence) => <View key={sentence.id}>
+        <Text className='description'>{lyricsForLane(sentence.lyrics, lane)}</Text>
+        {sentence.pronunciation && <Text className='muted'>{sentence.pronunciation.text}</Text>}
+      </View>)}
+    </View>
+    <RecordingPanel selection={selection} language={profile.language} />
+    <SavedTakes songId={songId} />
+  </View>;
+}

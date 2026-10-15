@@ -87,7 +87,7 @@ export function buildTrackSlotId(
 ) {
   const uniqueIds = Array.from(new Set(sentenceIds));
   if (uniqueIds.length === 0) return `${lane}:range:none:none:0`;
-  return `${lane}:range:${uniqueIds[0]}:${uniqueIds.at(-1)}:${uniqueIds.length}`;
+  return `${lane}:range:${uniqueIds[0]}:${uniqueIds[uniqueIds.length - 1]}:${uniqueIds.length}`;
 }
 
 export function lyricsForLane(lyrics: string, lane: "primary" | "secondary") {

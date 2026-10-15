@@ -1,4 +1,5 @@
 import { defineConfig } from '@tarojs/cli';
+import path from 'node:path';
 
 export default defineConfig<'webpack5'>({
   projectName: 'verseviva-wechat',
@@ -13,5 +14,8 @@ export default defineConfig<'webpack5'>({
   defineConstants: {
     VERSEVIVA_API_ORIGIN: JSON.stringify(process.env.TARO_APP_API_ORIGIN ?? ''),
   },
-  mini: { postcss: { pxtransform: { enable: true }, cssModules: { enable: false } } },
+  mini: {
+    compile: { include: [path.resolve(__dirname, '../../shared')] },
+    postcss: { pxtransform: { enable: true }, cssModules: { enable: false } },
+  },
 });

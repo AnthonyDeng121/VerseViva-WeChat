@@ -5,6 +5,7 @@ import { apiClient, friendlyError } from '../../network';
 import type { TaskRef } from '../../network/api';
 import { pendingTasks, songApi, useTask } from '../../network/useTask';
 import { useAuth } from '../../auth';
+import { SongPractice } from './SongPractice';
 
 export default function Practice() {
   const { params } = useRouter();
@@ -47,6 +48,7 @@ export default function Practice() {
   const labels: Record<string, string> = { queued: '正在排队', processing: '正在分析',
     completed: '歌曲准备完成', analyzed: '练唱分析完成', failed: '分析未完成',
     insufficient_data: '这次录音的可用证据不足' };
+  if (params.songId && /^song_[a-f0-9]{32}$/.test(params.songId)) return <View className='page'><SongPractice songId={params.songId} /></View>;
   return (
     <View className='page'>
       <Text className='title'>逐句练习</Text>

@@ -25,6 +25,8 @@ export default function Index() {
         <Text className='card-title'>逐句练习</Text>
         <Text className='muted'>从一句歌词开始，听参考、练发音，再录下自己的演唱。</Text>
         <Button onClick={() => Taro.navigateTo({ url: '/pages/practice/index' })}>进入练习</Button>
+        {[['03', 'get him back!'], ['04', "AS IF IT’S YOUR LAST"], ['05', '動物園は大変だ']].map(([suffix, title]) =>
+          <Button key={suffix} onClick={() => Taro.navigateTo({ url: `/pages/practice/index?songId=song_000000000000000000000000000000${suffix}` })}>{title}</Button>)}
       </View>
       <View className='card'>
         <Text className='card-title'>练习记忆</Text>
