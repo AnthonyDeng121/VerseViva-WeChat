@@ -4,6 +4,7 @@
 
 本项建立 `wx.login → FastAPI code2Session → 自有业务 Token` 链路，保留浏览器匿名 Cookie。
 代码和模拟上游回归不等于真实微信登录成功：当前后端微信开关关闭、AppID/AppSecret 未配置，独立微信版 HTTPS 入口和合法域名也尚未联调。
+用户已确认正式 AppID 为 `wx18a40d3837dc23ff`，源与 dist 项目配置均匹配；2026-10-15 复查确认小程序 `.env.local` 仍未创建。AppID 已具备，不再重复列为待申请事项。
 没有调用微信真实身份接口，没有部署服务器，没有读取或迁移原 Web 用户数据。
 
 ## 服务端链路
@@ -61,7 +62,7 @@ Memory 从可信所有者聚合，不采纳查询中的 session_id；Hero 参考
 - 退出先清内存/提示，再撤销捕获的旧 Token，不为退出而触发新登录。若网络阻断，明确提示只在本机退出，服务端旧 Token 到期失效。
 - 退出与再次登录会使旧请求代次失效；即使重新登录的是同一用户，迟到结果也不能恢复旧登录态或更新旧任务页面。
 
-录音、保存/删除、Memory 和完整私有播放器 UI 仍按后续清单实现；登录接通不表示这些产品闭环已验收。
+录音、保存/删除、Memory、私有播放器和服务端混音 UI 已在第四至七项实现；登录模拟回归通过不表示这些产品闭环已在真实微信验收。
 
 ## 配置
 
@@ -69,7 +70,7 @@ Memory 从可信所有者聚合，不采纳查询中的 session_id；Hero 参考
 
 ```dotenv
 VERSEVIVA_WECHAT_LOGIN_ENABLED=true
-VERSEVIVA_WECHAT_APP_ID=你的真实小程序AppID
+VERSEVIVA_WECHAT_APP_ID=wx18a40d3837dc23ff
 VERSEVIVA_WECHAT_APP_SECRET=仅放在服务器的AppSecret
 VERSEVIVA_WECHAT_TOKEN_TTL_SECONDS=7200
 VERSEVIVA_WECHAT_LOGIN_TIMEOUT_SECONDS=10

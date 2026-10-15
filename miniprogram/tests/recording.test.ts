@@ -10,13 +10,13 @@ const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 const selection: RecordingSelection = { songId: 'song_' + 'a'.repeat(32), sentenceIds: ['sentence_1'],
   trackSlotId: 'primary:range:s:s:1', selectionType: 'sentence', selectionStartSeconds: 1,
   selectionEndSeconds: 3, timelineStartSeconds: 1, latencyCompensationMs: 0, manualOffsetMs: 0 };
-function setup(options: { authorize?: () => Promise<void>; prepare?: () => Promise<void>; referenceStarts?: boolean } = {}) {
+function setup(options: { authorize?: () => Promise<void>; prepare?: () => Promise<void>; referenceStarts?: boolean; startThrowsOnce?: boolean } = {}) {
   let start!: () => void; let stop!: Parameters<RecorderDriver['onStop']>[0];
   let interrupt!: () => void; let error!: () => void;
   let starts = 0; let plays = 0; let owner = 'alice';
   const removed: string[] = []; const timers = new Map<number, () => void>(); let serial = 0;
   const controller = new RecorderController({
-    driver: () => ({ start() { starts += 1; }, stop() {}, onStart: (fn) => { start = fn; },
+    driver: () => ({ start() { starts += 1; if (options.startThrowsOnce && starts === 1) throw new Error('native start failed'); }, stop() {}, onStart: (fn) => { start = fn; },
       onStop: (fn) => { stop = fn; }, onError: (fn) => { error = fn; }, onInterruption: (fn) => { interrupt = fn; } }),
     owner: () => owner, authorize: options.authorize ?? (async () => {}),
     prepare: options.prepare ?? (async () => {}), playReference() { plays += 1;
@@ -50,6 +50,15 @@ test('permission refusal and preload failure never call native start', async () 
     await h.controller.start(selection); assert.equal(h.starts(), 0);
     assert.equal(h.controller.getSnapshot().phase, 'error');
   }
+});
+test('synchronous native start failure clears provisional recording and permits a new attempt', async () => {
+  const h = setup({ startThrowsOnce: true }); await requestStart(h);
+  assert.equal(h.controller.getSnapshot().phase, 'error');
+  assert.equal(h.controller.getSnapshot().clip, null); assert.equal(h.timers.size, 0);
+  await requestStart(h); assert.equal(h.controller.getSnapshot().phase, 'starting');
+  h.start(); h.controller.stop(); h.stop();
+  assert.equal(h.controller.getSnapshot().phase, 'preview');
+  assert.equal(h.starts(), 2); h.controller.discard();
 });
 test('actual reference start is required; missing playback times out and discards output', async () => {
   const h = setup({ referenceStarts: false }); await requestStart(h); h.start();

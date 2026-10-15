@@ -134,7 +134,12 @@ export class RecorderController {
       this.timer = this.delay(5000, () => this.interrupt('录音启动超时，请重新尝试。'));
       this.driver!.start(Math.min(600000, Math.ceil(seconds * 1000) + 1000));
     } catch (error) {
-      if (valid()) { this.dependencies.stopReference(); this.update({ phase: 'error', error: friendlyError(error) }); }
+      if (valid()) {
+        // A synchronous native start failure never reaches onStop. Release its
+        // provisional session and watchdog so the next attempt can start.
+        this.active = null; this.clearTimer();
+        this.dependencies.stopReference(); this.update({ phase: 'error', error: friendlyError(error) });
+      }
     }
   }
   stop() {
