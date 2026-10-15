@@ -5,7 +5,7 @@ page {
   font-synthesis: none;
 }
 
-* { box-sizing: border-box; }
+page, view, text, button, input, textarea, scroll-view, picker, slider, switch { box-sizing: border-box; }
 page { margin: 0; }
 button, input, textarea { font: inherit; }
 
@@ -257,7 +257,7 @@ audio { width: 100%; }
 .recording-page.hidden { display: none; }
 
 .recording-studio { display: flex; flex-direction: column; min-width: 0; max-width: 100%; overflow: hidden; margin-top: 24px; padding: 28px; border: 2px solid rgba(74,54,43,.16); border-radius: 32px; background: linear-gradient(145deg, #fffaf4, #f6ede4); font-size: 26px; }
-.recording-studio > * { order: 10; }
+.recording-studio > view, .recording-studio > text, .recording-studio > button { order: 10; }
 .recording-studio > .recording-heading { order: 1; }
 .recording-studio > .recording-switch-row { order: 2; }
 .recording-studio > .recording-purpose-note { order: 3; }

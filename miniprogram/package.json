@@ -15,7 +15,9 @@
     "test:mix": "node --experimental-transform-types --test tests/mix.test.ts",
     "test:lyrics": "node --experimental-transform-types --test tests/lyrics.test.ts",
     "test:layout": "node --experimental-transform-types --test tests/layout.test.ts",
-    "test:package": "node --test tests/package.test.cjs"
+    "test:package": "node --test tests/package.test.cjs",
+    "check:wxss": "node scripts/check-wxss.cjs",
+    "test:wxss": "node --test tests/wxss.test.cjs"
   },
   "dependencies": {
     "@tarojs/components": "4.3.0",

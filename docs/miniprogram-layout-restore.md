@@ -56,3 +56,19 @@ npm.cmd run check:package
 ```
 
 只有构建成功且完整性检查通过再启动模拟器。不要手工创建空 app.json，也不要提交 dist。构建恢复只解决缺文件的启动前置问题，未在开发者工具自动操作验证，不代表真机闭环或全部 UI 验收完成。
+
+## 后续 WXSS 编译失败：unexpected token `*`
+
+截图显示模拟器进入应用加载后报 WXSS 编译错误。本机开发者工具附带的 wcsc 对恢复前 dist/app.wxss 实测返回 `ERR: app.wxss(1:26): unexpected token '*'`（退出码 1），进一步确认 `.recording-studio > *` 也被拒绝。
+
+原因是恢复 H5 CSS 时保留了两处通配选择器；Webpack/CSS 压缩过程不执行微信原生 WXSS 语法检查，因此先前 Taro 构建成功未发现此问题。修复仅把通配符改成明确的原生组件类型，不改变颜色、尺寸或布局。选择器范围也可对照 [腾讯官方 WXSS 文档](https://intl.cloud.tencent.com/zh/document/product/1219/60346)。
+
+新增 `scripts/check-wxss.cjs`，使用本机安装的微信编译器逐个编译 dist 下 WXSS，限制单文件最多 30 秒；不会连接服务器或更改开发者工具配置。编译器路径通过参数/环境提供，不写死个人安装目录。使用方式：
+
+```powershell
+npm.cmd run check:wxss -- --compiler '微信开发者工具安装目录/resources/app.asar.unpacked/node_modules/wcc-exec/wcsc.exe'
+```
+
+运行原生编译器回归时，设置同一可执行文件的 `VERSEVIVA_WCSC` 环境变量后执行 `npm.cmd run test:wxss`。未设置时该测试明确跳过，不可将其计为原生编译已验。
+
+本轮实际设置了编译器路径，70 项客户端/共享/包/WXSS 回归全部通过、无跳过。新生产构建 8.12 秒，最终 dist/app.wxss 经同一微信编译器通过；包完整，24 文件、491225 bytes（479.7 KiB）。仅本地提交，不推送、不部署；开发者工具界面重新点击“编译”及真机视觉仍需用户验收。原预览联动等布局恢复欠项仍保留。

@@ -11,6 +11,7 @@
 - 待收尾：本机录音预览仍保留单播放器，原 H5 预览区伴奏/人声联动控件及选中轨道伴奏控制尚需进一步核对适配，不可宣称所有原交互已经一致。开发者工具/真机视觉尚未验，不能宣称像素级一致。后续先收尾此项，不直接推进第九项。细目见 `docs/miniprogram-layout-restore.md`。
 - 本次用户明确授权 commit+push，已推送至 `https://github.com/AnthonyDeng121/VerseViva-WeChat.git`，不包含部署授权；后续无新指令仍沿用仅本地修改/提交、不自行推送的约束。明显耗时过长且无进展的命令停止，等用户手动继续。不要重置旧提交或丢失前八项已完成的技术能力。
 - 模拟器“dist/app.json 未找到”已定位：上次中止构建后 dist 仅剩 project.config.json。源 miniprogramRoot=dist/ 配置正确，不应改为空；本次成功重建已恢复 app.json/app.js 及页面文件。小程序应导入 `miniprogram/`，构建产物继续忽略，不提交 dist。排障见 `docs/miniprogram-layout-restore.md`。
+- 后续 WXSS 报错已用本机微信开发者工具的 wcsc 复现：app.wxss(1:26) unexpected token `*`。恢复 H5 样式残留的全局 `*` 和 `.recording-studio > *` 改为明确原生组件选择器，布局/配色未变。新增 `check:wxss` 和可配置本地编译器回归；70 项客户端/共享/包/WXSS 测试通过（无跳过），生产构建 8.12 秒、最终 WXSS 原生编译及包检查通过，24 文件、491225 bytes（479.7 KiB）。本次只本地提交，不自动沿用上一轮 push 授权；未做完整模拟器/真机 UI 验收。注意 Webpack 构建成功不等于微信 WXSS 编译通过。
 
 ## 0. 当前工作：迁移为微信小程序（交接基线 2026-10-14）
 
