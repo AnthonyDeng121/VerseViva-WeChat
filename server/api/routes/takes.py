@@ -18,6 +18,7 @@ from server.models.recording import (
     TakeSaveMode,
 )
 from server.services.anonymous_session import session_id as request_session_id
+from server.services.audio_access import PRIVATE_AUDIO_HEADERS
 from server.services.language import supports_language_coaching
 from server.services.mixdown import render_mixdown
 from server.services.practice.service import analyze_practice_take
@@ -294,6 +295,7 @@ async def download_song_mixdown(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return FileResponse(
         output,
+        headers=PRIVATE_AUDIO_HEADERS,
         media_type="audio/mpeg",
         filename=f"{profile.title}-VerseViva整体混音.mp3",
         background=BackgroundTask(shutil.rmtree, output_dir, ignore_errors=True),
@@ -343,7 +345,7 @@ async def get_take_audio(take_id: str, request: Request) -> FileResponse:
     source = settings.data_dir / "takes" / take.take_id / take.stored_filename
     if not source.is_file():
         raise HTTPException(status_code=404, detail="Recording audio not found")
-    return FileResponse(source, media_type=take.mime_type)
+    return FileResponse(source, media_type=take.mime_type, headers=PRIVATE_AUDIO_HEADERS)
 
 
 @router.post("/takes/{take_id}/analyze", response_model=PracticeAttempt)

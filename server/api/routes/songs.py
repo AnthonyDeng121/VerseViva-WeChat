@@ -9,6 +9,7 @@ from server.config import get_settings
 from server.models.song import AnalysisJob, AnalysisStage, AnalysisStatus, SongProfile
 from server.pipelines.song_analysis import build_default_pipeline
 from server.services.anonymous_session import session_id
+from server.services.audio_access import PRIVATE_AUDIO_HEADERS
 from server.services.language import add_pronunciation_guides
 from server.services.song_access import PUBLIC_HERO_SONG_IDS
 from server.services.song_access import require_song_access as _require_song_access
@@ -303,7 +304,12 @@ async def get_song_audio(song_id: str, asset: str, request: Request) -> FileResp
         raise HTTPException(status_code=404, detail="Audio asset not found")
     if not source.is_file():
         raise HTTPException(status_code=404, detail="Audio asset not found")
-    return FileResponse(source)
+    return FileResponse(
+        source,
+        headers=PRIVATE_AUDIO_HEADERS
+        if song_id not in PUBLIC_HERO_SONG_IDS
+        else {"X-Content-Type-Options": "nosniff"},
+    )
 
 
 def _with_queue_position(job: AnalysisJob, request: Request) -> AnalysisJob:
