@@ -12,6 +12,8 @@ from server.config import get_settings
 from server.services.analysis_queue import AnalysisTaskQueue
 from server.services.anonymous_session import AnonymousSessionMiddleware
 from server.services.mix_jobs import MixJobs
+from server.services.resource_limits import ResourceLimitsMiddleware
+from server.services.runtime_lock import RuntimeLock
 from server.storage.job_store import JobStore
 
 
@@ -19,23 +21,31 @@ from server.storage.job_store import JobStore
 async def lifespan(application: FastAPI):
     settings = get_settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
-    (settings.data_dir / "jobs").mkdir(exist_ok=True)
-    (settings.data_dir / "songs").mkdir(exist_ok=True)
-    job_store = JobStore(settings.data_dir)
-    job_store.recover_interrupted_jobs()
-    analysis_queue = AnalysisTaskQueue(job_store)
-    analysis_queue.start()
-    application.state.analysis_queue = analysis_queue
-    application.state.mix_jobs = MixJobs(settings.data_dir, settings.ffmpeg_executable)
+    runtime_lock = RuntimeLock(settings.data_dir) if settings.resource_limits_enabled else None
     try:
-        yield
+        (settings.data_dir / "jobs").mkdir(exist_ok=True)
+        (settings.data_dir / "songs").mkdir(exist_ok=True)
+        job_store = JobStore(settings.data_dir)
+        job_store.recover_interrupted_jobs()
+        analysis_queue = AnalysisTaskQueue(job_store)
+        analysis_queue.start()
+        application.state.analysis_queue = analysis_queue
+        try:
+            application.state.mix_jobs = MixJobs(settings.data_dir, settings.ffmpeg_executable)
+            try:
+                yield
+            finally:
+                await application.state.mix_jobs.stop()
+        finally:
+            await analysis_queue.stop()
     finally:
-        await application.state.mix_jobs.stop()
-        await analysis_queue.stop()
+        if runtime_lock:
+            runtime_lock.close()
 
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+app.add_middleware(ResourceLimitsMiddleware, settings=settings)
 app.add_middleware(
     AnonymousSessionMiddleware,
     data_dir=settings.data_dir,

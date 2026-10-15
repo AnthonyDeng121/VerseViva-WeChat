@@ -19,6 +19,17 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = 100 * 1024 * 1024
     max_recording_size_bytes: int = 100 * 1024 * 1024
     auto_run_analysis_pipeline: bool = True
+    resource_limits_enabled: bool = False
+    resource_wechat_only: bool = True
+    resource_uploads_per_minute: int = Field(default=5, ge=1)
+    resource_uploads_per_day: int = Field(default=30, ge=1)
+    resource_ai_per_minute: int = Field(default=3, ge=1)
+    resource_ai_per_day: int = Field(default=30, ge=1)
+    resource_owner_bytes: int = Field(default=1024 * 1024 * 1024, ge=1)
+    resource_min_free_bytes: int = Field(default=1024 * 1024 * 1024, ge=0)
+    resource_max_pending_analysis: int = Field(default=8, ge=1)
+    resource_max_song_seconds: float = Field(default=600, gt=0)
+    resource_max_take_seconds: float = Field(default=600, gt=0)
     wechat_login_enabled: bool = False
     wechat_app_id: str = ""
     wechat_app_secret: SecretStr | None = None

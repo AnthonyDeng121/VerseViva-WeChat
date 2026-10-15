@@ -29,6 +29,7 @@ miniprogram/.taro/
 miniprogram/.swc/
 miniprogram/project.private.config.json
 miniprogram/.env.local
+.env.wechat
 miniprogram/.env.*.local
 *.tsbuildinfo
 .idea/

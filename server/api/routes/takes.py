@@ -28,6 +28,7 @@ from server.services.practice.service import (
     analyze_practice_take,
     failed_practice_attempt,
 )
+from server.services.resource_limits import enforce_audio_duration
 from server.services.song_access import require_song_access as _require_song_access
 from server.storage.practice_store import PracticeStore
 from server.storage.profile_store import ProfileStore
@@ -210,6 +211,7 @@ async def upload_take(
             destination.replace(corrected_destination)
             destination = corrected_destination
         content_type = detected_content_type
+        await enforce_audio_duration(destination, settings, recording=True)
 
         existing_takes = TakeStore(settings.data_dir).list_for_song(
             song_id,

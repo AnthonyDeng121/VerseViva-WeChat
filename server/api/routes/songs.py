@@ -11,6 +11,7 @@ from server.pipelines.song_analysis import build_default_pipeline
 from server.services.anonymous_session import session_id
 from server.services.audio_access import PRIVATE_AUDIO_HEADERS
 from server.services.language import add_pronunciation_guides
+from server.services.resource_limits import enforce_audio_duration
 from server.services.song_access import PUBLIC_HERO_SONG_IDS
 from server.services.song_access import require_song_access as _require_song_access
 from server.storage.job_store import JobStore
@@ -81,6 +82,7 @@ async def analyze_song(
                 status_code=415,
                 detail="File content does not match its audio extension",
             )
+        await enforce_audio_duration(destination, settings, recording=False)
     except Exception:
         destination.unlink(missing_ok=True)
         input_dir.rmdir()

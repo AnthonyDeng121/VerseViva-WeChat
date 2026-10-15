@@ -1,0 +1,29 @@
+name: verseviva-wechat
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env.wechat
+    command: ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    volumes:
+      - wechat-data:/app/data
+      - wechat-model-cache:/root/.cache
+    expose: ["8000"]
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      SITE_ADDRESS: ${WECHAT_SITE_ADDRESS:?Set an independent WeChat HTTPS hostname}
+    ports: ["${WECHAT_HTTP_PORT:-80}:80", "${WECHAT_HTTPS_PORT:-443}:443"]
+    volumes:
+      - ./deploy/Caddyfile.wechat:/etc/caddy/Caddyfile:ro
+      - wechat-caddy-data:/data
+      - wechat-caddy-config:/config
+volumes:
+  wechat-data:
+  wechat-model-cache:
+  wechat-caddy-data:
+  wechat-caddy-config:
