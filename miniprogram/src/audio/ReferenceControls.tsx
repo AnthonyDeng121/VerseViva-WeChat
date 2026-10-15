@@ -28,7 +28,7 @@ export function ReferenceControls({ songId, selection }: { songId: string; selec
       operation.current = audioResources.acquire({ kind: 'reference', songId, asset });
       const lease = await operation.current.promise;
       if (current !== generation.current) { lease.release(); return; }
-      await player.load(lease, selection?.selectionStartSeconds ?? 0);
+      await player.load(lease, selection?.selectionStartSeconds ?? 0, undefined, 0);
       if (current !== generation.current) return;
       loadedVersion.current = player.getVersion();
       await player.seek(selection?.selectionStartSeconds ?? 0);

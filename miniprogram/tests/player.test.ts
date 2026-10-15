@@ -53,3 +53,10 @@ test('private lease expiry cancels pending seek and cannot revive an old context
   h.lease.release(); await assert.rejects(seek); h.events.play(); h.events.seeked();
   assert.equal(h.player.getSnapshot().phase, 'idle');
 });
+test('rendered mix local playback time maps back to the original song; raw Take has no song clock', async () => {
+  const h = setup(); const ready = h.player.load(h.lease, 0, undefined, 10); h.events.canplay(); await ready;
+  h.audio.currentTime = 2; h.events.time(); assert.equal(h.player.getSnapshot().songTimeSeconds, 12);
+  h.player.reset(); assert.equal(h.player.getSnapshot().songTimeSeconds, null);
+  const raw = setup(); await raw.load(); raw.audio.currentTime = 2; raw.events.time();
+  assert.equal(raw.player.getSnapshot().songTimeSeconds, null); raw.player.reset();
+});

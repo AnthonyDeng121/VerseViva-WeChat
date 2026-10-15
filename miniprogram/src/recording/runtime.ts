@@ -30,7 +30,7 @@ export const recorder = new RecorderController({
     preparing = operation;
     const lease = await operation.promise;
     if (preparing === operation) preparing = null;
-    try { await player.load(lease, selection.selectionStartSeconds, 'recording'); }
+    try { await player.load(lease, selection.selectionStartSeconds, 'recording', 0); }
     catch (error) { lease.release(); player.unlock('recording'); throw error; }
     await player.seek(selection.selectionStartSeconds, 'recording');
   },

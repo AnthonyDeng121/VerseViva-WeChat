@@ -3,7 +3,12 @@ import type { SyncEvidence } from '../../../shared/recordingTypes';
 import { ApiClient, ApiError, type Operation } from './client.ts';
 
 export type Take = { takeId: string; songId: string; audioUrl: string; mimeType: string;
-  displayName?: string; trackSlotId?: string; sentenceIds?: string[]; gain?: number; muted?: boolean };
+  displayName?: string; trackSlotId?: string; sentenceIds?: string[]; gain?: number; muted?: boolean;
+  isCurrent?: boolean; timelineStartSeconds?: number; selectionStartSeconds?: number;
+  selectionEndSeconds?: number; latencyCompensationMs?: number; manualOffsetMs?: number };
+export type MixOptions = { takeIds: string[]; accompanimentVolume: number; voiceVolume: number; masterGain: number };
+export type MixJob = { jobId: string; songId: string; status: 'queued' | 'processing' | 'ready' | 'failed' | 'stale';
+  rangeStartSeconds: number; rangeEndSeconds: number; error: string; createdAt: number };
 export type Attempt = {
   takeId: string; attemptId?: string;
   status: 'processing' | 'analyzed' | 'failed' | 'insufficient_data';
@@ -100,7 +105,25 @@ export class VerseVivaApi {
     return this.client.request<void>('DELETE', `/api/v1/takes/${id(takeId)}?preserve_attempt=${preserveAttempt}`);
   }
   takes(songId: string) { return this.client.request<Take[]>('GET', `/api/v1/songs/${id(songId)}/takes`); }
+  updateTake(takeId: string, changes: { gain?: number; muted?: boolean; manualOffsetMs?: number }) {
+    return this.client.request<Take>('PATCH', `/api/v1/takes/${id(takeId)}`, { data: changes });
+  }
+  startMix(songId: string, options: MixOptions) {
+    return checked(this.client.request<MixJob>('POST', `/api/v1/songs/${id(songId)}/mix-jobs`, { data: options }),
+      (value) => validMix(value) && value.songId === songId);
+  }
+  mixJob(jobId: string) {
+    return checked(this.client.request<MixJob>('GET', `/api/v1/mix-jobs/${id(jobId)}`),
+      (value) => validMix(value) && value.jobId === jobId);
+  }
   memory() { return this.client.request<Memory>('GET', '/api/v1/practice/memory?session_id=miniprogram'); }
+}
+
+function validMix(value: MixJob) {
+  return /^mix_[a-f0-9]{32}$/.test(value.jobId) && typeof value.songId === 'string'
+    && ['queued', 'processing', 'ready', 'failed', 'stale'].includes(value.status)
+    && Number.isFinite(value.rangeStartSeconds) && Number.isFinite(value.rangeEndSeconds)
+    && value.rangeEndSeconds > value.rangeStartSeconds;
 }
 
 export function taskFinished(value: AnalysisJob | Attempt): boolean {

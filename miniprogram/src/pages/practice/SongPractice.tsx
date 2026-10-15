@@ -57,8 +57,11 @@ export function SongPractice({ songId }: { songId: string }) {
         const value = Number(event.detail.value); if (Number.isFinite(value)) { setLatency(Math.max(-2000, Math.min(2000, value))); setCalibrated(true); }
       }} />
       {profile.sentences.slice(start, end + 1).map((sentence) => <View key={sentence.id}
-        className={playback.phase === 'playing' && playback.timeSeconds >= sentence.startSeconds && playback.timeSeconds < sentence.endSeconds ? 'lyric-active' : ''}
-        onClick={() => { if (!busy && playback.phase !== 'idle') void player.seek(sentence.startSeconds).catch(() => {}); }}>
+        className={playback.phase === 'playing' && playback.songTimeSeconds !== null && playback.songTimeSeconds >= sentence.startSeconds && playback.songTimeSeconds < sentence.endSeconds ? 'lyric-active' : ''}
+        onClick={() => { if (!busy && playback.phase !== 'idle' && playback.songTimeSeconds !== null) {
+          const offset = playback.songTimeSeconds - playback.timeSeconds;
+          if (sentence.startSeconds >= offset) void player.seek(sentence.startSeconds - offset).catch(() => {});
+        } }}>
         <Text className='description'>{lane === 'primary' ? lyricsForLane(sentence.lyrics, lane)
           : profile.vocalParts.filter((part) => part.lane === 'secondary' && part.sentenceIds.includes(sentence.id)).map((part) => part.lyrics).join(' / ') || '本句无次声部'}</Text>
         {lane === 'primary' && sentence.pronunciation && <Text className='muted'>{sentence.pronunciation.text}</Text>}

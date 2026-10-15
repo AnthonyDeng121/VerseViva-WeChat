@@ -12,6 +12,7 @@ def render_mixdown(
     output: Path,
     accompaniment_volume: float,
     voice_volume: float,
+    master_gain: float = 1,
 ) -> None:
     current = [(take, path) for take, path in takes if take.is_current]
     if not current:
@@ -37,12 +38,15 @@ def render_mixdown(
         delay = max(0.0, clip_start - range_start)
         trim_start = max(0.0, range_start - clip_start)
         available = max(
-            0.01,
+            0,
             min(
-                take.selection_end_seconds - take.selection_start_seconds - trim_start,
+                (take.client_duration_seconds or
+                 take.selection_end_seconds - take.selection_start_seconds) - trim_start,
                 duration - delay,
             ),
         )
+        if available <= 0:
+            continue
         label = f"voice{input_index}"
         filters.append(
             f"[{input_index}:a]atrim=start={trim_start:.6f}:duration={available:.6f},"
@@ -52,7 +56,8 @@ def render_mixdown(
         labels.append(f"[{label}]")
     filters.append(
         f"{''.join(labels)}amix=inputs={len(labels)}:duration=longest:normalize=0,"
-        f"atrim=duration={duration:.6f}[mix]"
+        f"apad=whole_dur={duration:.6f},atrim=duration={duration:.6f},"
+        f"volume={master_gain:.6f}[mix]"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     command.extend(

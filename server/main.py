@@ -11,6 +11,7 @@ from server.api.router import api_router
 from server.config import get_settings
 from server.services.analysis_queue import AnalysisTaskQueue
 from server.services.anonymous_session import AnonymousSessionMiddleware
+from server.services.mix_jobs import MixJobs
 from server.storage.job_store import JobStore
 
 
@@ -25,9 +26,11 @@ async def lifespan(application: FastAPI):
     analysis_queue = AnalysisTaskQueue(job_store)
     analysis_queue.start()
     application.state.analysis_queue = analysis_queue
+    application.state.mix_jobs = MixJobs(settings.data_dir, settings.ffmpeg_executable)
     try:
         yield
     finally:
+        await application.state.mix_jobs.stop()
         await analysis_queue.stop()
 
 

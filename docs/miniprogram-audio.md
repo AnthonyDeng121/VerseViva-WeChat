@@ -60,7 +60,7 @@ Take 上传新增可选 `sync_evidence` JSON，响应为 `syncEvidence`，SQLite
 成功顺序为启动请求、录音开始、参考播放请求、参考实际播放、停止请求、录音停止；最多 16 KiB，字段/顺序/有限值校验，错误不回显原始 JSON。
 observedStartGapMs 仅记录参考实际播放与录音开始回调之差，不自动写成设备声学延迟。
 calibratedDeviceLatencyMs 与已有 latencyCompensationMs 一致；默认 0/unverified，用户手动填写后标为 user_calibrated。
-正补偿使 Take 在伴奏时间轴提前（timelineStart − latency/1000 + manualOffset/1000）；符号沿用共享时间轴测试。
+正补偿和正手动偏移都使 Take 在伴奏时间轴提前（timelineStart − (latency + manualOffset)/1000）；与共享算法及服务端一致。
 证据属于用户自报观察，不能用作鉴权、可信测量或替代 iOS/Android 真机校准。旧 Web 未上传此字段时保留 None。
 
 最终验证：客户端登录 9、网络 16、共享 3、音频 8、录音/提交 8，共 44 项；后端 168 项、Ruff、类型检查、构建和包检查通过。

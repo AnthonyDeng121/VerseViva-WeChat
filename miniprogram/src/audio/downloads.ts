@@ -3,6 +3,7 @@ import { ApiError, type Operation } from '../network/client.ts';
 export type AudioResource =
   | { kind: 'reference'; songId: string; asset: 'source' | 'vocals' | 'accompaniment' }
   | { kind: 'take'; takeId: string }
+  | { kind: 'mix-job'; jobId: string }
   | { kind: 'mix'; songId: string; accompanimentVolume?: number; voiceVolume?: number };
 export type AudioLease = { readonly path: string; release(): void; onRelease(callback: () => void): () => void };
 type Access = { ownerId: string; expiresAtMs: number };
@@ -26,6 +27,8 @@ export function resourceRequest(resource: AudioResource) {
   }
   if (resource.kind === 'take') return {
     path: `/api/v1/takes/${identifier(resource.takeId, 'take')}/audio`, access: 'private' as const };
+  if (resource.kind === 'mix-job') return {
+    path: `/api/v1/mix-jobs/${identifier(resource.jobId, 'mix')}/audio`, access: 'private' as const };
   const accompaniment = resource.accompanimentVolume ?? 0.55;
   const voice = resource.voiceVolume ?? 1;
   if (![accompaniment, voice].every((value) => Number.isFinite(value) && value >= 0 && value <= 1)) {

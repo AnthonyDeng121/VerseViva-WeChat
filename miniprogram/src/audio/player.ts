@@ -10,7 +10,7 @@ export type NativeAudio = {
   onTimeUpdate(fn: () => void): void; onWaiting(fn: () => void): void; onSeeked(fn: () => void): void;
 };
 export type PlayerSnapshot = { phase: 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'error';
-  timeSeconds: number; durationSeconds: number; rate: 1 | 0.75; error: string };
+  timeSeconds: number; songTimeSeconds: number | null; durationSeconds: number; rate: 1 | 0.75; error: string };
 export type PlaybackEvent = { kind: 'playing' | 'pause' | 'stop' | 'ended' | 'waiting' | 'seek' | 'error';
   atMs: number; positionSeconds: number };
 
@@ -26,7 +26,8 @@ export class LocalPlayer {
   private range: { start: number; end: number; loop: boolean } | null = null;
   private boundaryTimer?: ReturnType<typeof setTimeout>;
   private foreground = true;
-  private state: PlayerSnapshot = { phase: 'idle', timeSeconds: 0, durationSeconds: 0, rate: 1, error: '' };
+  private songTimeOffset: number | null = null;
+  private state: PlayerSnapshot = { phase: 'idle', timeSeconds: 0, songTimeSeconds: null, durationSeconds: 0, rate: 1, error: '' };
   private listeners = new Set<() => void>();
   private events = new Set<(event: PlaybackEvent) => void>();
   constructor(private create: () => NativeAudio, private now = () => Date.now()) {}
@@ -35,6 +36,7 @@ export class LocalPlayer {
   subscribe = (callback: () => void) => { this.listeners.add(callback); return () => { this.listeners.delete(callback); }; };
   onEvent(callback: (event: PlaybackEvent) => void) { this.events.add(callback); return () => { this.events.delete(callback); }; }
   private update(value: Partial<PlayerSnapshot>) {
+    if (value.timeSeconds !== undefined) value.songTimeSeconds = this.songTimeOffset === null ? null : value.timeSeconds + this.songTimeOffset;
     this.state = { ...this.state, ...value }; this.listeners.forEach((fn) => fn());
   }
   private emit(kind: PlaybackEvent['kind']) {
@@ -49,9 +51,10 @@ export class LocalPlayer {
   private check(owner?: string) {
     if (this.lockOwner && this.lockOwner !== owner) throw new ApiError('configuration', '请先结束录音再操作播放。');
   }
-  async load(lease: AudioLease, startSeconds = 0, owner?: string): Promise<void> {
+  async load(lease: AudioLease, startSeconds = 0, owner?: string, songTimeOffset: number | null = null): Promise<void> {
     if (!this.foreground) { lease.release(); throw new ApiError('cancelled', '页面已隐藏，播放已取消。'); }
     this.check(owner); this.reset(owner);
+    this.songTimeOffset = songTimeOffset;
     const generation = this.generation;
     this.lease = lease;
     let audio: NativeAudio;
@@ -168,6 +171,7 @@ export class LocalPlayer {
   }
   reset(owner?: string) {
     this.check(owner); this.generation += 1;
+    this.songTimeOffset = null;
     clearTimeout(this.boundaryTimer); this.range = null;
     if (this.pendingSeek) { clearTimeout(this.pendingSeek.timer); this.pendingSeek.reject(new ApiError('cancelled', '音频跳转已取消。')); this.pendingSeek = undefined; }
     this.loadReject?.(new ApiError('cancelled', '音频加载已取消。')); this.loadReject = undefined;

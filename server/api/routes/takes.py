@@ -330,6 +330,7 @@ async def update_take(
     changes = update.model_dump(exclude_none=True)
     updated = take.model_copy(update=changes)
     store.save(updated)
+    request.app.state.mix_jobs.invalidate_take(take.session_id, take_id)
     return updated
 
 
@@ -344,6 +345,7 @@ async def delete_take(
     take = TakeStore(settings.data_dir).delete(take_id)
     if take is None:
         raise HTTPException(status_code=404, detail="Recording Take not found")
+    request.app.state.mix_jobs.invalidate_take(take.session_id, take_id)
     if not preserve_attempt:
         PracticeStore(settings.data_dir).delete_for_take(take_id)
     take_dir = (settings.data_dir / "takes" / take_id).resolve()
