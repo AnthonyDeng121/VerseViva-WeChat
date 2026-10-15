@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     language_worker_token: SecretStr | None = None
     gemini_api_key: SecretStr | None = None
     gemini_model: str = "gemini-3.8-flash"
+    practice_request_timeout_seconds: float = Field(default=60, ge=1, le=120)
     practice_acoustic_provider: Literal["disabled", "gemini"] = "gemini"
     practice_issue_confidence_threshold: float = 0.65
     glm_api_key: SecretStr | None = None

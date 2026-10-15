@@ -1,3 +1,5 @@
+import asyncio
+import math
 import re
 import subprocess
 from pathlib import Path
@@ -27,6 +29,24 @@ from server.services.practice.coach import GlmPracticeCoach
 from server.services.practice.models import AcousticFinding, FindingResult
 from server.storage.practice_store import PracticeStore
 
+PRACTICE_ANALYSIS_VERSION = "practice-language-v7"
+
+
+def failed_practice_attempt(
+    settings: Settings, take: RecordingTake, error: Exception,
+) -> PracticeAttempt:
+    return PracticeAttempt(
+        attempt_id=f"attempt_{uuid4().hex}", take_id=take.take_id,
+        session_id=take.session_id, song_id=take.song_id, track_slot_id=take.track_slot_id,
+        sentence_ids=take.sentence_ids, status=PracticeStatus.failed,
+        comparison=AttemptComparison(result=ComparisonResult.insufficient_data),
+        insufficient_reason=public_model_failure_message(error),
+        acoustic_provider=settings.practice_acoustic_provider, acoustic_model=settings.gemini_model,
+        coaching_provider="glm" if settings.glm_api_key else "template_fallback",
+        coaching_model=settings.glm_model if settings.glm_api_key else "rules-v1",
+        analysis_version=PRACTICE_ANALYSIS_VERSION,
+    )
+
 
 async def analyze_practice_take(
     settings: Settings,
@@ -39,7 +59,7 @@ async def analyze_practice_take(
     if (
         existing is not None
         and existing.status == PracticeStatus.analyzed
-        and existing.analysis_version == "practice-language-v6"
+        and existing.analysis_version == PRACTICE_ANALYSIS_VERSION
     ):
         return existing
 
@@ -60,6 +80,7 @@ async def analyze_practice_take(
         "song_id": take.song_id,
         "track_slot_id": take.track_slot_id,
         "sentence_ids": take.sentence_ids,
+        "analysis_version": PRACTICE_ANALYSIS_VERSION,
         "acoustic_provider": settings.practice_acoustic_provider,
         "acoustic_model": settings.gemini_model,
         "coaching_provider": "glm" if settings.glm_api_key else "template_fallback",
@@ -106,17 +127,23 @@ async def analyze_practice_take(
         )
         store.save(attempt)
         return attempt
-    if settings.practice_acoustic_provider != "gemini" or settings.gemini_api_key is None:
-        attempt = PracticeAttempt(
-            **base,
-            status=PracticeStatus.insufficient_data,
-            comparison=_comparison(history, []),
-            insufficient_reason="练唱声学分析尚未配置 Gemini API Key。",
+    if (settings.practice_acoustic_provider != "gemini" or settings.gemini_api_key is None
+            or not settings.gemini_api_key.get_secret_value().strip()):
+        attempt = failed_practice_attempt(
+            settings, take, RuntimeError("Practice model unavailable"),
         )
         store.save(attempt)
         return attempt
 
-    if not _has_audible_signal(settings.ffmpeg_executable, audio_path):
+    try:
+        audible = await asyncio.to_thread(
+            _has_audible_signal, settings.ffmpeg_executable, audio_path,
+        )
+    except Exception as exc:
+        attempt = failed_practice_attempt(settings, take, exc)
+        store.save(attempt)
+        return attempt
+    if not audible:
         attempt = PracticeAttempt(
             **base,
             status=PracticeStatus.insufficient_data,
@@ -129,6 +156,7 @@ async def analyze_practice_take(
     analyzer = GeminiPracticeAnalyzer(
         settings.gemini_api_key.get_secret_value(),
         settings.gemini_model,
+        request_timeout_seconds=settings.practice_request_timeout_seconds,
     )
     try:
         if is_secondary and secondary_parts:
@@ -182,12 +210,7 @@ async def analyze_practice_take(
     # Empty findings previously fell through to "no issues" and were incorrectly
     # presented as a successful attempt, including for silent recordings.
     if not _has_audible_judgment(batch.findings):
-        attempt = PracticeAttempt(
-            **base,
-            status=PracticeStatus.insufficient_data,
-            comparison=_comparison(history, []),
-            insufficient_reason="未听到足够的演唱内容，无法判断语言动作，请重新录制。",
-        )
+        attempt = failed_practice_attempt(settings, take, RuntimeError("No target judgments"))
         store.save(attempt)
         return attempt
 
@@ -219,7 +242,17 @@ async def analyze_practice_take(
             if issue_type_for_hint(hint) is not None
         }
     )
-    evaluations = _build_target_evaluations(batch.findings, target_types)
+    evaluations = _build_target_evaluations(
+        batch.findings, target_types, settings.practice_issue_confidence_threshold,
+    )
+    if not evaluations:
+        attempt = PracticeAttempt(
+            **base, status=PracticeStatus.insufficient_data,
+            comparison=AttemptComparison(result=ComparisonResult.insufficient_data),
+            insufficient_reason="本次录音不足以可靠判断。",
+        )
+        store.save(attempt)
+        return attempt
     comparison = _comparison(history, evaluations)
     target_ids_by_sentence = {
         sentence.id: {
@@ -289,8 +322,17 @@ def _has_audible_signal(ffmpeg_executable: str, audio_path: Path) -> bool:
         timeout=30,
         check=False,
     )
-    match = re.search(r"max_volume:\s*(-?[\d.]+)\s*dB", result.stderr)
-    return match is None or float(match.group(1)) > -45.0
+    if result.returncode != 0:
+        raise RuntimeError("Recording signal probe failed")
+    match = re.search(r"max_volume:\s*(-?(?:[\d.]+|inf))\s*dB", result.stderr, re.IGNORECASE)
+    if match is None:
+        raise RuntimeError("Recording signal probe returned no peak evidence")
+    peak = float(match.group(1))
+    if peak == float("-inf"):
+        return False
+    if not math.isfinite(peak):
+        raise RuntimeError("Recording signal probe returned invalid peak evidence")
+    return peak > -45.0
 
 
 def _primary_only_sentence(sentence: SongSentence) -> SongSentence:
@@ -419,11 +461,14 @@ def _comparable_history(store: PracticeStore, take: RecordingTake) -> list[Pract
 def _build_target_evaluations(
     findings: list[AcousticFinding],
     target_types: dict[str, LanguageIssueType],
+    threshold: float = 0.65,
 ) -> list[TargetEvaluation]:
     evaluations = []
     for finding in findings:
-        issue_type = finding.issue_type or target_types.get(finding.hint_id)
-        if finding.result == FindingResult.uncertain or issue_type is None:
+        issue_type = target_types.get(finding.hint_id)
+        if (finding.result == FindingResult.uncertain or issue_type is None
+            or finding.confidence < threshold
+            or (finding.issue_type is not None and finding.issue_type != issue_type)):
             continue
         evaluations.append(
             TargetEvaluation(

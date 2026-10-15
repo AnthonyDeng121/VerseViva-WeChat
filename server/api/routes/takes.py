@@ -23,7 +23,11 @@ from server.services.anonymous_session import session_id as request_session_id
 from server.services.audio_access import PRIVATE_AUDIO_HEADERS
 from server.services.language import supports_language_coaching
 from server.services.mixdown import render_mixdown
-from server.services.practice.service import analyze_practice_take
+from server.services.practice.service import (
+    PRACTICE_ANALYSIS_VERSION,
+    analyze_practice_take,
+    failed_practice_attempt,
+)
 from server.services.song_access import require_song_access as _require_song_access
 from server.storage.practice_store import PracticeStore
 from server.storage.profile_store import ProfileStore
@@ -32,6 +36,7 @@ from server.storage.take_store import TakeStore
 router = APIRouter()
 CHUNK_SIZE = 1024 * 1024
 ANALYSIS_TASKS: dict[str, asyncio.Task] = {}
+_PRESERVE_DELETED_ATTEMPTS: set[str] = set()
 ALLOWED_RECORDING_TYPES = {
     ".webm": {"audio/webm", "video/webm", "application/octet-stream"},
     ".mp4": {"audio/mp4", "video/mp4", "application/octet-stream"},
@@ -342,6 +347,8 @@ async def delete_take(
 ) -> None:
     settings = get_settings()
     _owned_take(take_id, request)
+    if preserve_attempt and take_id in ANALYSIS_TASKS:
+        _PRESERVE_DELETED_ATTEMPTS.add(take_id)
     take = TakeStore(settings.data_dir).delete(take_id)
     if take is None:
         raise HTTPException(status_code=404, detail="Recording Take not found")
@@ -388,17 +395,28 @@ async def analyze_take(take_id: str, request: Request) -> PracticeAttempt:
 
 
 async def _run_take_analysis(take_id: str) -> None:
+    settings = get_settings()
+    take = None
     try:
-        settings = get_settings()
         take = TakeStore(settings.data_dir).get(take_id)
         if take is None:
             return
         profile = ProfileStore(settings.data_dir).get(take.song_id)
         source = settings.data_dir / "takes" / take.take_id / take.stored_filename
-        if profile is not None and source.is_file():
-            await analyze_practice_take(settings, take, profile, source)
+        if profile is None or not source.is_file():
+            raise FileNotFoundError("Practice input unavailable")
+        await analyze_practice_take(settings, take, profile, source)
+    except Exception as exc:
+        if take is not None and TakeStore(settings.data_dir).get(take_id) is not None:
+            PracticeStore(settings.data_dir).save(failed_practice_attempt(settings, take, exc))
     finally:
-        ANALYSIS_TASKS.pop(take_id, None)
+        # A late worker must not recreate feedback after the user deleted the Take.
+        if (TakeStore(settings.data_dir).get(take_id) is None
+                and take_id not in _PRESERVE_DELETED_ATTEMPTS):
+            PracticeStore(settings.data_dir).delete_for_take(take_id)
+        _PRESERVE_DELETED_ATTEMPTS.discard(take_id)
+        if ANALYSIS_TASKS.get(take_id) is asyncio.current_task():
+            ANALYSIS_TASKS.pop(take_id, None)
 
 
 @router.post("/takes/{take_id}/analysis-jobs", status_code=status.HTTP_202_ACCEPTED)
@@ -418,7 +436,8 @@ async def start_take_analysis(
             detail="中文歌曲不进行语言现象或练唱分析，可使用纯唱录音与多轨混音",
         )
     existing = PracticeStore(settings.data_dir).get_for_take(take_id)
-    if existing is not None and existing.analysis_version == "practice-language-v6" and not force:
+    if (existing is not None and existing.analysis_version == PRACTICE_ANALYSIS_VERSION
+            and not force):
         return {"takeId": take_id, "status": "complete"}
     running = ANALYSIS_TASKS.get(take_id)
     if running is None or running.done():

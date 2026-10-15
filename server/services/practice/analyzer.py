@@ -8,6 +8,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import httpx
+from pydantic import ValidationError
+
 from server.models.practice import LanguageIssueType
 from server.models.song import LanguageHint, SongSentence, VocalPart
 from server.pipelines.language_coach import _is_retryable_gemini_error
@@ -17,11 +20,21 @@ from server.services.practice.models import AcousticFinding, AcousticFindingBatc
 class GeminiPracticeAnalyzer:
     provider = "gemini"
 
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(self, api_key: str, model: str, request_timeout_seconds: float = 60) -> None:
         if not api_key:
             raise ValueError("Gemini API key is required for practice analysis")
         self.api_key = api_key
         self.model = model
+        self.request_timeout_seconds = request_timeout_seconds
+
+    def _client(self):
+        from google import genai
+
+        # SDK timeout is milliseconds; retries belong to our bounded batch loop.
+        return genai.Client(api_key=self.api_key, http_options={
+            "timeout": int(self.request_timeout_seconds * 1000),
+            "retry_options": {"attempts": 1},
+        })
 
     async def analyze(
         self,
@@ -113,12 +126,14 @@ class GeminiPracticeAnalyzer:
                 if batch.recording_usable and (
                     not batch.findings
                     or all(item.result == FindingResult.uncertain for item in batch.findings)
-                ) and attempt < 2:
-                    continue
+                ):
+                    raise RuntimeError(
+                        "temporarily unavailable: Gemini returned no conclusive target judgments"
+                    )
                 return batch
             except Exception as exc:
                 last_error = exc
-                if attempt == 2 or not _is_retryable_gemini_error(exc):
+                if attempt == 2 or not _retryable_practice_error(exc):
                     raise
                 time.sleep(2 ** (attempt + 1))
         raise RuntimeError("Gemini secondary practice analysis failed") from last_error
@@ -175,7 +190,7 @@ class GeminiPracticeAnalyzer:
                 return batch
             except Exception as exc:
                 last_error = exc
-                if attempt == 2 or not _is_retryable_gemini_error(exc):
+                if attempt == 2 or not _retryable_practice_error(exc):
                     raise
                 time.sleep(2 ** (attempt + 1))
         raise RuntimeError("Gemini practice analysis failed") from last_error
@@ -186,21 +201,13 @@ class GeminiPracticeAnalyzer:
         sentences: list[SongSentence],
         reference_vocal_path: Path | None,
     ) -> AcousticFindingBatch:
-        try:
-            from google import genai
-        except ImportError as exc:
-            raise RuntimeError("Practice analysis requires google-genai") from exc
-
-        client = genai.Client(api_key=self.api_key)
-        uploaded = _upload_and_wait(client, audio_path, "用户录音")
+        client = self._client()
+        uploaded = None
         reference_audio = None
         try:
+            uploaded = _upload_and_wait(client, audio_path, "用户录音")
             if reference_vocal_path is not None:
                 reference_audio = _upload_and_wait(client, reference_vocal_path, "参考人声")
-        except Exception:
-            _delete_uploaded_file(client, uploaded)
-            raise
-        try:
             audio_inputs = []
             if reference_audio is not None:
                 audio_inputs.append(
@@ -231,16 +238,12 @@ class GeminiPracticeAnalyzer:
             )
             batch = AcousticFindingBatch.model_validate_json(interaction.output_text)
             known = {hint.id for sentence in sentences for hint in sentence.language_hints}
-            findings = [finding for finding in batch.findings if finding.hint_id in known]
+            findings = _validated_findings(batch.findings, known)
             return batch.model_copy(update={"findings": findings})
         finally:
             for item in (uploaded, reference_audio):
-                name = getattr(item, "name", None)
-                if name:
-                    try:
-                        client.files.delete(name=name)
-                    except Exception:
-                        pass
+                _delete_uploaded_file(client, item)
+            _close_client(client)
 
     def _analyze_secondary_once(
         self,
@@ -252,21 +255,13 @@ class GeminiPracticeAnalyzer:
         *,
         use_reference: bool,
     ) -> AcousticFindingBatch:
-        try:
-            from google import genai
-        except ImportError as exc:
-            raise RuntimeError("Practice analysis requires google-genai") from exc
-
-        client = genai.Client(api_key=self.api_key)
-        user_audio = _upload_and_wait(client, audio_path, "用户录音")
+        client = self._client()
+        user_audio = None
         reference_audio = None
-        if use_reference:
-            try:
-                reference_audio = _upload_and_wait(client, reference_vocal_path, "参考人声")
-            except Exception:
-                _delete_uploaded_file(client, user_audio)
-                raise
         try:
+            user_audio = _upload_and_wait(client, audio_path, "用户录音")
+            if use_reference:
+                reference_audio = _upload_and_wait(client, reference_vocal_path, "参考人声")
             audio_inputs = []
             if reference_audio is not None:
                 audio_inputs.append(
@@ -305,16 +300,33 @@ class GeminiPracticeAnalyzer:
             )
             batch = AcousticFindingBatch.model_validate_json(interaction.output_text)
             known = {item["hintId"] for item in targets}
-            findings = [item for item in batch.findings if item.hint_id in known]
+            findings = _validated_findings(batch.findings, known)
             return batch.model_copy(update={"findings": findings})
         finally:
-            for uploaded in (user_audio, reference_audio):
-                name = getattr(uploaded, "name", None)
-                if name:
-                    try:
-                        client.files.delete(name=name)
-                    except Exception:
-                        pass
+            for item in (user_audio, reference_audio):
+                _delete_uploaded_file(client, item)
+            _close_client(client)
+
+
+
+def _retryable_practice_error(exc: Exception) -> bool:
+    return isinstance(
+        exc, (ValidationError, json.JSONDecodeError, TimeoutError, httpx.TransportError),
+    ) or _is_retryable_gemini_error(exc)
+
+
+def _validated_findings(findings: list[AcousticFinding], known: set[str]) -> list[AcousticFinding]:
+    filtered = [item for item in findings if item.hint_id in known]
+    if len({item.hint_id for item in filtered}) != len(filtered):
+        raise RuntimeError("temporarily unavailable: duplicate target judgments")
+    return filtered
+
+
+def _close_client(client) -> None:
+    try:
+        client.close()
+    except Exception:
+        pass
 
 
 def issue_type_for_hint(hint: LanguageHint) -> LanguageIssueType | None:
@@ -343,8 +355,10 @@ def _wait_for_active(client, uploaded, timeout_seconds: float = 60.0):
     while time.monotonic() < deadline:
         state = getattr(current, "state", None)
         state_name = str(getattr(state, "name", state) or "").upper()
-        if state_name.endswith("ACTIVE") or not state_name:
+        if state_name.rsplit(".", 1)[-1] == "ACTIVE":
             return current
+        if not state_name or state_name.endswith("INACTIVE"):
+            raise RuntimeError("temporarily unavailable: invalid Gemini file state")
         if state_name.endswith("FAILED"):
             error = getattr(current, "error", None)
             detail = f"：{error}" if error else ""
@@ -352,7 +366,7 @@ def _wait_for_active(client, uploaded, timeout_seconds: float = 60.0):
         time.sleep(1)
         name = getattr(current, "name", None)
         if not name:
-            return current
+            raise RuntimeError("temporarily unavailable: Gemini file missing resource name")
         current = client.files.get(name=name)
     raise TimeoutError("Gemini 音频文件未在 60 秒内准备完成")
 
