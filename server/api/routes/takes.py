@@ -34,11 +34,13 @@ ALLOWED_RECORDING_TYPES = {
     ".m4a": {"audio/mp4", "audio/x-m4a", "application/octet-stream"},
     ".ogg": {"audio/ogg", "application/ogg", "application/octet-stream"},
     ".wav": {"audio/wav", "audio/x-wav", "application/octet-stream"},
+    ".mp3": {"audio/mpeg", "audio/mp3", "application/octet-stream"},
+    ".aac": {"audio/aac", "audio/aacp", "audio/x-aac", "application/octet-stream"},
 }
 
 
 def _recording_format(header: bytes) -> tuple[str, str] | None:
-    """Identify the stored format from bytes instead of trusting browser metadata."""
+    """Identify the stored format from bytes, including WeChat temporary files."""
     if header.startswith(b"\x1aE\xdf\xa3"):
         return ".webm", "audio/webm"
     if len(header) >= 12 and header[4:8] == b"ftyp":
@@ -47,6 +49,29 @@ def _recording_format(header: bytes) -> tuple[str, str] | None:
         return ".ogg", "audio/ogg"
     if len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE":
         return ".wav", "audio/wav"
+    if (
+        len(header) >= 10
+        and header[:3] == b"ID3"
+        and header[3] in {2, 3, 4}
+        and all(value < 128 for value in header[6:10])
+    ):
+        return ".mp3", "audio/mpeg"
+    if len(header) >= 4 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0:
+        # MPEG audio: non-reserved version, Layer III, valid bitrate/sample rate.
+        if (
+            header[1] & 0x18 != 0x08
+            and header[1] & 0x06 == 0x02
+            and header[2] >> 4 not in {0, 15}
+            and header[2] & 0x0C != 0x0C
+        ):
+            return ".mp3", "audio/mpeg"
+        # AAC ADTS uses layer=00; do not mistake its syncword for MPEG audio.
+        if len(header) >= 7 and header[1] & 0xF6 == 0xF0:
+            sample_rate_index = (header[2] >> 2) & 0x0F
+            frame_length = ((header[3] & 0x03) << 11) | (header[4] << 3) | (header[5] >> 5)
+            minimum_header = 7 if header[1] & 1 else 9
+            if sample_rate_index <= 12 and frame_length >= minimum_header:
+                return ".aac", "audio/aac"
     return None
 
 
@@ -120,19 +145,21 @@ async def upload_take(
         raise HTTPException(status_code=422, detail="Vocal Part does not belong to this song")
 
     suffix = Path(audio.filename or "").suffix.lower()
-    expected_content_types = ALLOWED_RECORDING_TYPES.get(suffix)
     content_type = (
         (audio.content_type or "application/octet-stream").split(";", 1)[0].strip().lower()
     )
-    if expected_content_types is None or content_type not in expected_content_types:
+    allowed_content_types = set().union(*ALLOWED_RECORDING_TYPES.values())
+    if content_type not in allowed_content_types:
         raise HTTPException(
             status_code=415,
-            detail="Recordings must be WebM, MP4/M4A, OGG, or WAV audio",
+            detail="Recordings must be WebM, MP4/M4A, OGG, WAV, MP3, or AAC audio",
         )
 
     take_id = f"take_{uuid4().hex}"
     take_dir = settings.data_dir / "takes" / take_id
     take_dir.mkdir(parents=True, exist_ok=False)
+    # wx.uploadFile may use a .tmp/extensionless name; only bytes determine storage.
+    suffix = suffix if suffix in ALLOWED_RECORDING_TYPES else ".upload"
     destination = take_dir / f"original{suffix}"
     size = 0
     header = b""

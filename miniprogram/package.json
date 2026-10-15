@@ -7,7 +7,8 @@
     "build:weapp": "taro build --type weapp",
     "typecheck": "tsc --noEmit",
     "check:package": "node scripts/check-package.cjs",
-    "test:shared": "node --test ../shared/audioTimeline.test.ts"
+    "test:shared": "node --test ../shared/audioTimeline.test.ts",
+    "test:network": "node --experimental-transform-types --test tests/network.test.ts"
   },
   "dependencies": {
     "@tarojs/components": "4.3.0",

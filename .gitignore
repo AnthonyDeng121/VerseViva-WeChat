@@ -28,6 +28,8 @@ miniprogram/dist/
 miniprogram/.taro/
 miniprogram/.swc/
 miniprogram/project.private.config.json
+miniprogram/.env.local
+miniprogram/.env.*.local
 *.tsbuildinfo
 .idea/
 .vscode/

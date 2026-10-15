@@ -10,5 +10,8 @@ export default defineConfig<'webpack5'>({
   framework: 'react',
   compiler: { type: 'webpack5', prebundle: { enable: false } },
   cache: { enable: false },
+  defineConstants: {
+    VERSEVIVA_API_ORIGIN: JSON.stringify(process.env.TARO_APP_API_ORIGIN ?? ''),
+  },
   mini: { postcss: { pxtransform: { enable: true }, cssModules: { enable: false } } },
 });
