@@ -2,8 +2,8 @@ export default defineAppConfig({
   pages: ['pages/index/index', 'pages/practice/index', 'pages/memory/index'],
   window: {
     navigationBarTitleText: '声声不息',
-    navigationBarBackgroundColor: '#f7f4ed',
+    navigationBarBackgroundColor: '#f2f5f1',
     navigationBarTextStyle: 'black',
-    backgroundColor: '#f7f4ed',
+    backgroundColor: '#f2f5f1',
   },
 });

@@ -4,6 +4,7 @@ import { ApiClient, ApiError, type Operation } from './client.ts';
 
 export type Take = { takeId: string; songId: string; audioUrl: string; mimeType: string;
   displayName?: string; trackSlotId?: string; sentenceIds?: string[]; gain?: number; muted?: boolean;
+  purpose?: 'guided_practice' | 'free_overdub';
   isCurrent?: boolean; timelineStartSeconds?: number; selectionStartSeconds?: number;
   selectionEndSeconds?: number; latencyCompensationMs?: number; manualOffsetMs?: number };
 export type MixOptions = { takeIds: string[]; accompanimentVolume: number; voiceVolume: number; masterGain: number };
@@ -66,6 +67,10 @@ export class VerseVivaApi {
   retrySong(jobId: string) {
     return checked(this.client.request<AnalysisJob>('POST', `/api/v1/songs/jobs/${id(jobId)}/retry`), validJob);
   }
+  reanalyzeSong(songId: string) {
+    return checked(this.client.request<AnalysisJob>('POST', `/api/v1/songs/${id(songId)}/reanalyze`), validJob);
+  }
+  deleteSong(songId: string) { return this.client.request<void>('DELETE', `/api/v1/songs/${id(songId)}`); }
   // Cancel is a server operation; stopping local polling alone never cancels a job.
   cancelSong(jobId: string) {
     return this.client.request<void>('DELETE', `/api/v1/songs/jobs/${id(jobId)}`);
@@ -109,7 +114,7 @@ export class VerseVivaApi {
     return this.client.request<void>('DELETE', `/api/v1/takes/${id(takeId)}?preserve_attempt=${preserveAttempt}`);
   }
   takes(songId: string) { return this.client.request<Take[]>('GET', `/api/v1/songs/${id(songId)}/takes`); }
-  updateTake(takeId: string, changes: { gain?: number; muted?: boolean; manualOffsetMs?: number }) {
+  updateTake(takeId: string, changes: { gain?: number; muted?: boolean; manualOffsetMs?: number; displayName?: string }) {
     return this.client.request<Take>('PATCH', `/api/v1/takes/${id(takeId)}`, { data: changes });
   }
   startMix(songId: string, options: MixOptions) {

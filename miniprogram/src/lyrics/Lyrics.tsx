@@ -1,74 +1,107 @@
-import { useState } from 'react';
-import { Button, Text, View } from '@tarojs/components';
-import type { LanguageHint, SongProfile, SongSentence } from '../../../shared/songTypes';
-import { confidenceLabel, hintTarget, projectLine, sourceLabel, type Lane } from './presentation';
+import { useEffect, useState } from 'react';
+import { Button, ScrollView, Text, View } from '@tarojs/components';
+import type { LanguageHint, SongProfile, SongSentence, VocalPart } from '../../../shared/songTypes';
+import { alignVocalRows } from '../../../shared/audioTimeline';
+import { confidenceLabel, hintTarget, projectLine, sourceLabel } from './presentation';
 
-function Line({ sentence, lane, original, exactText }: {
-  sentence: SongSentence; lane: Lane; original?: string; exactText?: string;
+type Detail = { text: string; original: string; hints: LanguageHint[]; index: number };
+type DisplayLine = { text: string; original: string; hints: LanguageHint[] };
+function AnnotatedLine({ line, active, past, compact, onSeek, onSelect }: {
+  line: DisplayLine; active: boolean; past: boolean; compact?: boolean; onSeek: () => void; onSelect: (detail: Detail) => void;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const line = projectLine(sentence, lane, exactText);
-  const originalText = original ?? projectLine({ ...sentence, pronunciation: null }, lane).text;
-  const hint = line.hints.find((item) => item.id === selected);
-  return <View>
-    {sentence.pronunciation && <Text className='lyric-original'>{originalText}</Text>}
-    <View className='lyric-text'>
-      {line.text.trim() ? Array.from(line.text).map((character, index) => <Text key={index}>
-        {character}{line.hints.flatMap((item) => item.marks.filter((mark) => mark.startCharIndex === index)
-          .map((mark, markIndex) => <Text key={`${item.id}-${markIndex}`} className='lyric-mark'
-            onClick={() => setSelected(item.id)}>{mark.symbol}</Text>))}
-      </Text>) : <Text>{sentence.pronunciation ? '辅助读音尚未可靠定位' : originalText || '本句无对应声部'}</Text>}
+  return <View className={`lyric-line ${active ? 'active' : ''} ${past ? 'past' : ''} ${compact ? 'compact' : ''}`}
+    onClick={() => { onSeek(); if (line.hints.length) onSelect({ ...line, index: 0 }); }}>
+    {line.original !== line.text && <Text className='lyric-original'>{line.original}</Text>}
+    <View className={line.original !== line.text ? 'lyric-pronunciation' : 'lyric-original'}>
+      {Array.from(line.text || line.original).map((character, index) => <Text className='lyric-character' key={index}>
+        {character}{line.hints.flatMap((hint, hintIndex) => hint.marks.filter((mark) => mark.startCharIndex === index)
+          .map((mark, markIndex) => <Text key={`${hint.id}-${markIndex}`}
+            className={`character-mark below ${mark.symbol === '×' ? 'elision' : mark.symbol === '‿' ? 'boundary link' : 'boundary merge'}`}
+            onClick={(event) => { event.stopPropagation(); onSelect({ ...line, index: hintIndex }); }}>{mark.symbol === '└─┘' ? '└┘' : mark.symbol}</Text>))}
+      </Text>)}
     </View>
-    {line.hints.length > 0 && <View className='hint-buttons'>{line.hints.map((item) => <Button key={item.id}
-      className='hint-button' onClick={() => setSelected(selected === item.id ? null : item.id)}>
-      {item.marks.map((mark) => mark.symbol).join(' ')} {hintTarget(line.text, item)} · 详情
-    </Button>)}</View>}
-    {hint && <HintDetail hint={hint} target={hintTarget(line.text, hint)} original={originalText} />}
   </View>;
 }
 
-function HintDetail({ hint, target, original }: { hint: LanguageHint; target: string; original: string }) {
-  const detail = hint.details.find((item) => item.locale === 'zh-CN') ?? hint.details[0];
-  return <View className='hint-detail'>
-    <Text className='card-title'>{hint.marks.map((mark) => mark.symbol).join(' ')} {target}</Text>
-    <Text className='muted'>原文：{original}</Text>
-    {hint.canonicalPronunciation && <Text className='muted'>标准 / 辅助读音：{hint.canonicalPronunciation}</Text>}
-    {hint.observedPronunciation && <Text className='muted'>演唱读音提示：{hint.observedPronunciation}</Text>}
-    <Text className='description'>下一遍：{detail?.action || '建议待补充'}</Text>
-    <Text className='muted'>{detail?.explanation || '解释待补充'}</Text>
-    <Text className='muted'>{sourceLabel(hint.source)} · {confidenceLabel(hint.confidence)}</Text>
-    <Text className='muted'>{hint.evidence.needsHumanReview === true ? '需要人工复核'
-      : hint.evidence.needsHumanReview === false ? '未标记为待复核' : '复核状态未知'}</Text>
-    <Text className='muted'>证据强度：{({ strong: '较强', moderate: '中等', medium: '中等', weak: '较弱' }[hint.evidence.evidenceStrength ?? ''] ?? '未标注')}</Text>
-  </View>;
-}
-
-export function Lyrics({ profile, start, end, lane, time, onSeek }: {
-  profile: SongProfile; start: number; end: number; lane: Lane; time: number | null; onSeek: (seconds: number) => void;
-}) {
+export function Lyrics({ profile, time, onSeek }: { profile: SongProfile; time: number | null; onSeek: (seconds: number) => void }) {
+  const [mode, setMode] = useState<'standard' | 'layers'>('standard');
+  const [detail, setDetail] = useState<Detail | null>(null);
+  useEffect(() => { setDetail(null); setMode(profile.sentences.length ? 'standard' : 'layers'); }, [profile.songId]);
+  const current = time ?? 0;
+  const activeSentence = profile.sentences.findIndex((sentence) => current >= sentence.startSeconds && current < sentence.endSeconds);
+  const primary: VocalPart[] = profile.vocalParts.filter((part) => part.lane === 'primary')
+    .sort((a, b) => a.startSeconds - b.startSeconds);
+  const anchors: VocalPart[] = primary.length ? primary : profile.sentences.map((sentence) => ({
+    id: sentence.id, lane: 'primary', role: 'lead', lyrics: sentence.lyrics, sentenceIds: [sentence.id],
+    startSeconds: sentence.startSeconds, endSeconds: sentence.endSeconds, source: 'lyrics_structure_candidate', confidence: 0,
+    needsHumanReview: true, identityStatus: 'candidate', timingStatus: 'aligned_sentence_fallback', timingNeedsHumanReview: true, evidence: {},
+  }));
+  const rows = alignVocalRows(anchors, profile.vocalParts.filter((part) => part.lane === 'secondary').sort((a, b) => a.startSeconds - b.startSeconds));
+  const activeRow = rows.findIndex((row) => [...row.primary, ...row.secondary].some((part) => current >= part.startSeconds && current < part.endSeconds));
+  function partLine(part: VocalPart): DisplayLine {
+    const sentence = profile.sentences.find((item) => part.sentenceIds.includes(item.id))
+      ?? profile.sentences.find((item) => item.startSeconds < part.endSeconds && item.endSeconds > part.startSeconds);
+    const original = part.lane === 'primary' ? part.lyrics.replace(/\s*[（(][^）)]*[）)]/g, '').trim() : part.lyrics;
+    if (!sentence) return { text: original, original, hints: [] };
+    const line = projectLine(sentence, part.lane, part.lane === 'secondary' ? original : undefined);
+    return { ...line, original };
+  }
+  function standardLine(sentence: SongSentence): DisplayLine {
+    const visible = new Set([...projectLine(sentence, 'primary').hints, ...projectLine(sentence, 'secondary').hints].map((hint) => hint.id));
+    return { original: sentence.lyrics, text: sentence.pronunciation?.text ?? sentence.lyrics,
+      hints: sentence.languageHints.filter((hint) => visible.has(hint.id)) };
+  }
   return <View>
-    <Text className='muted'>× 目标音未清楚出现或释放 · ‿ 跨词连续动作 · └─┘ 共享或融合。点击标记或详情查看练习动作。</Text>
-    {profile.sentences.slice(start, end + 1).map((sentence, index) => {
-      const parts = profile.vocalParts.filter((part) => part.lane === 'secondary' && part.sentenceIds.includes(sentence.id));
-      const primary = projectLine(sentence, 'primary');
-      const secondaryHints = parts.flatMap((part) => projectLine(sentence, 'secondary', part.lyrics).hints);
-      const visible = new Set([...primary.hints, ...secondaryHints].map((hint) => hint.id));
-      const hidden = sentence.languageHints.some((hint) => !visible.has(hint.id));
-      return <View key={sentence.id} className={time !== null && time >= sentence.startSeconds && time < sentence.endSeconds ? 'lyric-row lyric-active' : 'lyric-row'}>
-        <Button className='seek-button' onClick={() => onSeek(sentence.startSeconds)}>第 {start + index + 1} 句 · 跳到这里</Button>
-        <View className={lane === 'primary' ? 'lyric-lane lane-primary lane-selected' : 'lyric-lane lane-primary'}>
-          <Text className='lane-label'>主唱{lane === 'primary' ? ' · 当前练习' : ''}</Text>
-          <Line sentence={sentence} lane='primary' />
-        </View>
-        {parts.map((part) => <View key={part.id} className={lane === 'secondary' ? 'lyric-lane lane-secondary lane-selected' : 'lyric-lane lane-secondary'}>
-          <Text className='lane-label'>次声部{lane === 'secondary' ? ' · 当前练习' : ''}</Text>
-          <Line sentence={sentence} lane='secondary' original={part.lyrics} exactText={part.lyrics} />
-          <Text className='muted'>{sourceLabel(part.source)} · {confidenceLabel(part.confidence)}</Text>
-          <Text className='muted'>{part.identityStatus === 'confirmed' ? '声部已确认' : '候选声部'} · {part.needsHumanReview ? '文本待复核' : '文本未标记为待复核'} · {part.timingNeedsHumanReview ? '时间待复核' : '时间未标记为待复核'}</Text>
+    <View className='legend'><Text>× 吞音(不发音)</Text><Text>‿ 连读(改音)</Text><Text>└┘ 连读(二合一)</Text></View>
+    {!!profile.vocalParts.length && <View className='lyrics-stage-heading'><View className='lyrics-mode-switch'>
+      <Button className={mode === 'standard' ? 'active' : ''} onClick={() => { setMode('standard'); setDetail(null); }}>普通歌词</Button>
+      <Button className={mode === 'layers' ? 'active' : ''} onClick={() => { setMode('layers'); setDetail(null); }}>双轨歌词</Button>
+    </View></View>}
+    {profile.analysis.lyricsSource === 'asr' && <Text className='asr-lyrics-warning'>联网搜索歌词失败，使用自动识别，可能误差较大，请理解！</Text>}
+    {mode === 'standard' ? <ScrollView className='lyrics-viewport' scrollY scrollWithAnimation scrollIntoView={activeSentence >= 0 ? `sentence-${activeSentence}` : undefined}>
+      <View className='lyrics-list'>{profile.sentences.map((sentence, index) => <View id={`sentence-${index}`} key={sentence.id}>
+        <AnnotatedLine line={standardLine(sentence)} active={index === activeSentence} past={current >= sentence.endSeconds}
+          onSelect={setDetail} onSeek={() => onSeek(sentence.startSeconds)} />
+      </View>)}</View>
+      {!profile.sentences.length && <Text className='lyrics-empty'>当前缓存只包含 Vocal 分层信息；重新上传音频可生成语言标注歌词。</Text>}
+    </ScrollView> : <View className='vocal-layers'>
+      <View className='vocal-lane-heading'><View className='vocal-lane-title'><Text>主 Vocal</Text><Text>PRIMARY</Text></View>
+        <View className='vocal-lane-title secondary'><Text>次 Vocal</Text><Text>SECONDARY</Text></View></View>
+      <ScrollView className='vocal-lane-scroll' scrollY scrollWithAnimation scrollIntoView={activeRow >= 0 ? `vocal-row-${activeRow}` : undefined}>
+        {rows.map((row, index) => <View className='vocal-lane-row' id={`vocal-row-${index}`} key={index}>
+          {(['primary', 'secondary'] as const).map((lane) => <View className={`vocal-lane-cell ${lane}`} key={lane}>
+            {row[lane].map((part) => <AnnotatedLine key={part.id} line={partLine(part)} compact
+              active={current >= part.startSeconds && current < part.endSeconds} past={current >= part.endSeconds}
+              onSelect={setDetail} onSeek={() => onSeek(part.startSeconds)} />)}
+          </View>)}
         </View>)}
-        {!parts.length && <Text className='muted'>本句无已标注次声部。</Text>}
-        {hidden && <Text className='muted'>部分语言标记尚不能可靠定位到此声部，暂不绘制，需复核。</Text>}
-      </View>;
-    })}
+      </ScrollView>
+    </View>}
+    {detail && <HintDetail key={`${profile.songId}:${detail.original}:${detail.index}`} detail={detail} />}
+  </View>;
+}
+
+function HintDetail({ detail }: { detail: Detail }) {
+  const [index, setIndex] = useState(detail.index); const [metadata, setMetadata] = useState(false);
+  const hint = detail.hints[index]; if (!hint) return null;
+  const explanation = hint.details.find((item) => item.locale === 'zh-CN') ?? hint.details[0];
+  return <View className='hint-detail'>
+    <Button className='hint-arrow' disabled={detail.hints.length < 2} onClick={() => setIndex((index - 1 + detail.hints.length) % detail.hints.length)}>‹</Button>
+    <View className='hint-content'>
+      <View className='detail-heading'><Text className='technique-display'>{hintTarget(detail.text, hint)} {hint.marks.map((mark) => mark.symbol === '└─┘' ? '└┘' : mark.symbol).join(' ')}</Text><Text>{index + 1}/{detail.hints.length}</Text></View>
+      {detail.original !== detail.text && <View className='pronunciation-breakdown'>
+        <Text>原文：{detail.original}</Text><Text>辅助读音：{hint.canonicalPronunciation ?? detail.text}</Text>
+        {hint.observedPronunciation && <Text>演唱提示：{hint.observedPronunciation}</Text>}
+      </View>}
+      <Text className='action'>建议：{explanation?.action || '建议待补充'}</Text>
+      <Text>专业分析：{explanation?.explanation || '解释待补充'}</Text>
+      <Text className='text-button' onClick={() => setMetadata(!metadata)}>来源与复核 {metadata ? '▾' : '▸'}</Text>
+      {metadata && <View className='review-note'>
+        <Text>{sourceLabel(hint.source)} · {confidenceLabel(hint.confidence)}</Text>
+        <Text>{hint.evidence.needsHumanReview === true ? '需要人工复核' : hint.evidence.needsHumanReview === false ? '未标记为待复核' : '复核状态未知'}</Text>
+        <Text>证据强度：{({ strong: '较强', moderate: '中等', medium: '中等', weak: '较弱' }[hint.evidence.evidenceStrength ?? ''] ?? '未标注')}</Text>
+      </View>}
+    </View>
+    <Button className='hint-arrow' disabled={detail.hints.length < 2} onClick={() => setIndex((index + 1) % detail.hints.length)}>›</Button>
   </View>;
 }

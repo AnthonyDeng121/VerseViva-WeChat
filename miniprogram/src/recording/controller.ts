@@ -6,6 +6,7 @@ export type RecordingSelection = {
   selectionType: 'sentence' | 'segment'; selectionStartSeconds: number; selectionEndSeconds: number;
   timelineStartSeconds: number; latencyCompensationMs: number; manualOffsetMs: number;
   calibrationStatus?: 'unverified' | 'user_calibrated';
+  recordingReference?: 'source' | 'accompaniment'; purpose?: 'guided_practice' | 'free_overdub';
 };
 export type RecordingEvent = SyncEvent;
 export type RecordingClip = { filePath: string; durationSeconds: number; ownerId: string;

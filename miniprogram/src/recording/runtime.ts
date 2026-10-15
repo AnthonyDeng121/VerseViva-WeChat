@@ -26,7 +26,7 @@ export const recorder = new RecorderController({
   },
   async prepare(selection) {
     player.lock('recording');
-    const operation = audioResources.acquire({ kind: 'reference', songId: selection.songId, asset: 'accompaniment' });
+    const operation = audioResources.acquire({ kind: 'reference', songId: selection.songId, asset: selection.recordingReference ?? 'accompaniment' });
     preparing = operation;
     const lease = await operation.promise;
     if (preparing === operation) preparing = null;

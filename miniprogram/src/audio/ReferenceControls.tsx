@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button, Text, View } from '@tarojs/components';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Button, Slider, Text, View } from '@tarojs/components';
 import { useDidHide } from '@tarojs/taro';
 import type { RecordingSelection } from '../recording/controller';
 import { player, usePlayer, useRecording } from '../recording/runtime';
@@ -7,8 +7,12 @@ import { audioResources } from './resources';
 import type { AudioLease } from './downloads';
 import type { Operation } from '../network/client';
 import { friendlyError } from '../network';
+import { formatTime } from '../ui/practiceLayout';
 
-export function ReferenceControls({ songId, selection }: { songId: string; selection: RecordingSelection | null }) {
+export type ReferenceHandle = { seek(seconds: number): Promise<void> };
+export const ReferenceControls = forwardRef<ReferenceHandle, {
+  songId: string; title: string; selection: RecordingSelection | null; technique: boolean;
+}>(function ReferenceControls({ songId, title, selection, technique }, ref) {
   const state = usePlayer(); const recording = useRecording();
   const [asset, setAsset] = useState<'source' | 'vocals' | 'accompaniment'>('source');
   const [rate, setRate] = useState<1 | 0.75>(1); const [loop, setLoop] = useState(false);
@@ -19,37 +23,60 @@ export function ReferenceControls({ songId, selection }: { songId: string; selec
   const locked = !['idle', 'preview', 'interrupted', 'error'].includes(recording.phase);
   const cancel = () => { generation.current += 1; operation.current?.abort(); operation.current = null; setBusy(false); };
   useDidHide(cancel); useEffect(() => cancel, []);
-  useEffect(() => {
-    if (!locked) { cancel(); player.reset(); }
-  }, [songId, selection?.selectionStartSeconds, selection?.selectionEndSeconds]);
-  async function play() {
+  useEffect(() => { if (!locked) { cancel(); player.reset(); loadedVersion.current = null; } }, [songId]);
+  async function load(seconds: number, autoplay: boolean) {
+    if (locked) return;
     cancel(); const current = generation.current; setBusy(true); setError('');
     try {
-      operation.current = audioResources.acquire({ kind: 'reference', songId, asset });
-      const lease = await operation.current.promise;
-      if (current !== generation.current) { lease.release(); return; }
-      await player.load(lease, selection?.selectionStartSeconds ?? 0, undefined, 0);
-      if (current !== generation.current) return;
-      loadedVersion.current = player.getVersion();
-      await player.seek(selection?.selectionStartSeconds ?? 0);
+      if (loadedVersion.current !== player.getVersion() || player.getSnapshot().phase === 'idle') {
+        operation.current = audioResources.acquire({ kind: 'reference', songId, asset });
+        const lease = await operation.current.promise;
+        if (current !== generation.current) { lease.release(); return; }
+        await player.load(lease, seconds, undefined, 0);
+        if (current !== generation.current) return;
+        loadedVersion.current = player.getVersion();
+      }
+      await player.seek(seconds);
       if (current !== generation.current) return;
       player.setRate(rate);
-      player.setRange(selection ? { start: selection.selectionStartSeconds, end: selection.selectionEndSeconds, loop } : null);
-      player.play();
+      player.setRange(loop && selection ? { start: selection.selectionStartSeconds, end: selection.selectionEndSeconds, loop: true } : null);
+      if (autoplay) player.play();
     } catch (reason) { if (current === generation.current) setError(friendlyError(reason)); }
     finally { if (current === generation.current) { setBusy(false); operation.current = null; } }
   }
-  return <View className='card'><Text className='card-title'>参考播放</Text>
-    {([['source', '原曲'], ['vocals', '人声'], ['accompaniment', '伴奏']] as const).map(([value, label]) =>
-      <Button key={value} disabled={locked || busy} onClick={() => { player.reset(); setAsset(value); }}>{asset === value ? '✓ ' : ''}{label}</Button>)}
-    <Button disabled={locked || busy} onClick={() => { const next = rate === 1 ? 0.75 : 1; setRate(next);
-      if (ownsPlayback && state.phase !== 'idle') { try { player.setRate(next); } catch (reason) { setError(friendlyError(reason)); setRate(1); } } }}>{rate}× · 点击切换</Button>
-    <Button disabled={locked || busy || !selection} onClick={() => { const next = !loop; setLoop(next);
-      if (ownsPlayback && state.phase !== 'idle' && selection) player.setRange({ start: selection.selectionStartSeconds, end: selection.selectionEndSeconds, loop: next }); }}>句范围循环：{loop ? '开' : '关'}</Button>
-    <Button disabled={locked || busy} onClick={() => void play()}>{busy ? '正在准备…' : '从选句起点播放'}</Button>
-    <Button disabled={locked || !ownsPlayback || state.phase !== 'playing'} onClick={() => player.pause()}>暂停</Button>
-    <Button disabled={locked || !ownsPlayback || state.phase !== 'paused'} onClick={() => player.play()}>继续</Button>
-    <Text className='muted'>当前位置 {state.timeSeconds.toFixed(1)} 秒。句循环使用微信播放事件与计时控制，精度以真机为准。</Text>
-    {(error || state.error) && <Text className='muted'>{error || state.error}</Text>}
+  useImperativeHandle(ref, () => ({ seek: (seconds) => load(seconds, false) }));
+  function selectAsset(next: typeof asset) { cancel(); player.reset(); loadedVersion.current = null; setAsset(next); }
+  return <View>
+    <View className='profile-heading'>
+      <Text className='profile-title'>{title.replace(/\s*[—-]\s*Language\s*&\s*Vocal\s*Layers\s*$/i, '').trim()}</Text>
+      <View className='audio-mode-switch'>
+        {([['source', '原曲'], ['vocals', '人声'], ['accompaniment', '伴奏']] as const).map(([value, label]) =>
+          <Button key={value} disabled={locked || busy} className={asset === value ? 'active' : ''} onClick={() => selectAsset(value)}>{label}</Button>)}
+      </View>
+    </View>
+    <View className='players'><View className='native-player-row'>
+      <Text>{asset === 'source' ? '原曲' : asset === 'vocals' ? '人声' : '伴奏'}</Text>
+      <Button className='player-toggle' disabled={locked || busy} onClick={() => {
+        if (ownsPlayback && state.phase === 'playing') player.pause();
+        else if (ownsPlayback && state.phase === 'paused') player.play();
+        else void load(ownsPlayback ? state.timeSeconds : 0, true);
+      }}>{busy ? '…' : ownsPlayback && state.phase === 'playing' ? 'Ⅱ' : '▶'}</Button>
+      <Text>{formatTime(ownsPlayback ? state.timeSeconds : 0)}</Text>
+      <Slider className='player-progress' min={0} max={Math.max(state.durationSeconds, 1)} step={0.1}
+        value={ownsPlayback ? state.timeSeconds : 0} disabled={locked || busy || !ownsPlayback}
+        onChange={(event) => void load(event.detail.value, ownsPlayback && state.phase === 'playing')} />
+      <Text>{formatTime(ownsPlayback ? state.durationSeconds : 0)}</Text>
+    </View></View>
+    <View className={technique ? 'learning-playback-controls' : 'hidden'}>
+      <View className='speed-switch'>{([1, .75] as const).map((value) => <Button key={value} disabled={locked || busy} className={rate === value ? 'active' : ''} onClick={() => {
+        setRate(value); if (ownsPlayback && state.phase !== 'idle') { try { player.setRate(value); } catch (reason) { setError(friendlyError(reason)); setRate(1); } }
+      }}>{value === 1 ? '原速' : '0.75×'}</Button>)}</View>
+      <Button className={`sentence-loop-button ${loop ? 'active' : ''}`} disabled={locked || busy || !selection} onClick={() => {
+        const next = !loop; setLoop(next);
+        if (ownsPlayback && selection) player.setRange(next ? { start: selection.selectionStartSeconds, end: selection.selectionEndSeconds, loop: true } : null);
+      }}>{loop ? '停止循环' : '循环当前句'}</Button>
+      <Text>点击歌词跳转</Text>
+    </View>
+    {(error || (ownsPlayback && state.error)) && <Text className='recording-error'>{error || state.error}</Text>}
   </View>;
-}
+});
