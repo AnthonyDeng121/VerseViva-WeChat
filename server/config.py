@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     max_recording_size_bytes: int = 100 * 1024 * 1024
     auto_run_analysis_pipeline: bool = True
     resource_limits_enabled: bool = False
+    release_review_required: bool = False
+    release_review_file: Path = Path("deploy/wechat-release-review.json")
     resource_wechat_only: bool = True
     resource_uploads_per_minute: int = Field(default=5, ge=1)
     resource_uploads_per_day: int = Field(default=30, ge=1)

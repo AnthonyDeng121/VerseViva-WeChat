@@ -349,6 +349,8 @@ async def delete_take(
 ) -> None:
     settings = get_settings()
     _owned_take(take_id, request)
+    if not preserve_attempt:
+        PracticeStore(settings.data_dir).forget_take(take_id)
     if preserve_attempt and take_id in ANALYSIS_TASKS:
         _PRESERVE_DELETED_ATTEMPTS.add(take_id)
     take = TakeStore(settings.data_dir).delete(take_id)
@@ -480,6 +482,20 @@ async def get_practice_memory(
     request: Request, session_id: str = Query(...)
 ) -> PracticeMemory:
     return PracticeStore(get_settings().data_dir).memory(request_session_id(request))
+
+
+@router.delete("/practice/attempts/{attempt_id}", status_code=204)
+async def delete_retained_attempt(attempt_id: str, request: Request) -> None:
+    """Remove feedback retained by analyze-only after its original Take was deleted."""
+    settings = get_settings()
+    store = PracticeStore(settings.data_dir)
+    attempt = store.get(attempt_id)
+    if attempt is None or attempt.session_id != request_session_id(request):
+        raise HTTPException(404, "Practice attempt not found")
+    if TakeStore(settings.data_dir).get(attempt.take_id) is not None:
+        raise HTTPException(409, "Delete the associated Take to remove audio and feedback")
+    _PRESERVE_DELETED_ATTEMPTS.discard(attempt.take_id)
+    store.forget_take(attempt.take_id)
 
 
 def _owned_take(take_id: str, request: Request) -> RecordingTake:

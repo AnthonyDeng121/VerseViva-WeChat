@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "checks": {
+    "privacy_contract": {"status": "pending", "evidence": "", "reviewedAt": ""},
+    "recording_consent": {"status": "pending", "evidence": "", "reviewedAt": ""},
+    "ai_disclosure": {"status": "pending", "evidence": "", "reviewedAt": ""},
+    "processor_regions": {"status": "pending", "evidence": "", "reviewedAt": ""},
+    "provider_terms_and_audience": {"status": "pending", "evidence": "", "reviewedAt": ""},
+    "deletion_and_backups": {"status": "pending", "evidence": "", "reviewedAt": ""},
+    "wechat_platform_setup": {"status": "pending", "evidence": "", "reviewedAt": ""}
+  },
+  "providers": {
+    "gemini": {"status": "pending", "processingRegion": "unverified", "evidence": ""},
+    "glm": {"status": "pending", "processingRegion": "unverified", "evidence": ""}
+  },
+  "assets": [
+    {"songId": "song_00000000000000000000000000000003", "status": "unverified", "scopes": [], "evidence": "", "reviewedAt": ""},
+    {"songId": "song_00000000000000000000000000000004", "status": "unverified", "scopes": [], "evidence": "", "reviewedAt": ""},
+    {"songId": "song_00000000000000000000000000000005", "status": "unverified", "scopes": [], "evidence": "", "reviewedAt": ""}
+  ]
+}

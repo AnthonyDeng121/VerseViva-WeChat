@@ -16,6 +16,9 @@ class PracticeStore:
         self.database = data_dir / "verseviva.sqlite3"
         with self._connect() as connection:
             connection.execute(
+                "CREATE TABLE IF NOT EXISTS practice_deletions (take_id TEXT PRIMARY KEY)"
+            )
+            connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS practice_attempts (
                     attempt_id TEXT PRIMARY KEY,
@@ -40,6 +43,11 @@ class PracticeStore:
 
     def save(self, attempt: PracticeAttempt) -> None:
         with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if connection.execute(
+                "SELECT 1 FROM practice_deletions WHERE take_id=?", (attempt.take_id,)
+            ).fetchone():
+                return
             connection.execute(
                 """INSERT OR REPLACE INTO practice_attempts
                 (attempt_id, take_id, session_id, song_id, track_slot_id, created_at, payload)
@@ -66,8 +74,32 @@ class PracticeStore:
         with self._connect() as connection:
             connection.execute("DELETE FROM practice_attempts WHERE take_id = ?", (take_id,))
 
+    def forget_take(self, take_id: str) -> None:
+        """Deletion wins over delayed model responses, including synchronous legacy calls."""
+        with self._connect() as connection:
+            connection.execute("INSERT OR IGNORE INTO practice_deletions VALUES (?)", (take_id,))
+            connection.execute("DELETE FROM practice_attempts WHERE take_id=?", (take_id,))
+
+    def get(self, attempt_id: str) -> PracticeAttempt | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT payload FROM practice_attempts WHERE attempt_id=?", (attempt_id,)
+            ).fetchone()
+        return PracticeAttempt.model_validate_json(row["payload"]) if row else None
+
     def delete_for_song(self, song_id: str, session_id: str) -> None:
         with self._connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO practice_deletions SELECT take_id FROM practice_attempts "
+                "WHERE song_id=? AND session_id=?", (song_id, session_id),
+            )
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE name='recording_takes'"
+            ).fetchone():
+                connection.execute(
+                    "INSERT OR IGNORE INTO practice_deletions SELECT take_id FROM recording_takes "
+                    "WHERE song_id=? AND session_id=?", (song_id, session_id),
+                )
             connection.execute(
                 "DELETE FROM practice_attempts WHERE song_id = ? AND session_id = ?",
                 (song_id, session_id),

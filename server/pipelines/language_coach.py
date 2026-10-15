@@ -5,6 +5,7 @@ from pathlib import Path
 
 from server.models.song import SongSentence
 from server.services.language.models import LanguageCandidate, LanguageObservationBatch
+from server.services.provider_files import delete_provider_file
 
 
 class DisabledLanguageCoach:
@@ -81,6 +82,7 @@ class GeminiLanguageCoach:
         uploaded = client.files.upload(file=str(vocal_audio))
         try:
             interaction = client.interactions.create(
+                store=False,
                 model=self.model,
                 input=[
                     {"type": "text", "text": _build_prompt(lyrics, sentences, candidates)},
@@ -105,12 +107,7 @@ class GeminiLanguageCoach:
             ]
             return batch.model_copy(update={"observations": filtered})
         finally:
-            name = getattr(uploaded, "name", None)
-            if name:
-                try:
-                    client.files.delete(name=name)
-                except Exception:
-                    pass
+            delete_provider_file(client, uploaded)
 
 
 def _is_retryable_gemini_error(exc: Exception) -> bool:

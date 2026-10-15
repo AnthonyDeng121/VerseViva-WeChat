@@ -203,6 +203,7 @@ def test_remote_files_and_client_close_on_every_exit(monkeypatch, failure, secon
         return SimpleNamespace(name=name, state="ACTIVE", uri="private-uri", mime_type="audio/mpeg")
 
     def create(**kwargs):
+        assert kwargs["store"] is False
         if failure == "model":
             raise RuntimeError("model failed")
         return SimpleNamespace(

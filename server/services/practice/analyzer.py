@@ -15,6 +15,7 @@ from server.models.practice import LanguageIssueType
 from server.models.song import LanguageHint, SongSentence, VocalPart
 from server.pipelines.language_coach import _is_retryable_gemini_error
 from server.services.practice.models import AcousticFinding, AcousticFindingBatch, FindingResult
+from server.services.provider_files import delete_provider_file
 
 
 class GeminiPracticeAnalyzer:
@@ -225,6 +226,7 @@ class GeminiPracticeAnalyzer:
                 }
             )
             interaction = client.interactions.create(
+                store=False,
                 model=self.model,
                 input=[
                     {"type": "text", "text": _build_prompt(sentences)},
@@ -279,6 +281,7 @@ class GeminiPracticeAnalyzer:
                 }
             )
             interaction = client.interactions.create(
+                store=False,
                 model=self.model,
                 input=[
                     {
@@ -381,12 +384,7 @@ def _upload_and_wait(client, audio_path: Path, label: str):
 
 
 def _delete_uploaded_file(client, uploaded) -> None:
-    name = getattr(uploaded, "name", None)
-    if name:
-        try:
-            client.files.delete(name=name)
-        except Exception:
-            pass
+    delete_provider_file(client, uploaded)
 
 
 @contextmanager

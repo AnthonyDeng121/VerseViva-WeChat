@@ -38,10 +38,18 @@ class GlmPracticeCoach:
                                 "content": json.dumps(
                                     {
                                         "issues": [
-                                            item.model_dump(mode="json", by_alias=True)
+                                            item.model_dump(mode="json", by_alias=True,
+                                                            exclude={"hint_id", "sentence_id"})
                                             for item in issues
                                         ],
-                                        "memory": memory.model_dump(mode="json", by_alias=True),
+                                        "memory": memory.model_dump(
+                                            mode="json", by_alias=True,
+                                            exclude={
+                                                "session_id": True, "updated_at": True,
+                                                "phenomena": {
+                                                    "__all__": {"last_practiced_at"}},
+                                            },
+                                        ),
                                     },
                                     ensure_ascii=False,
                                 ),

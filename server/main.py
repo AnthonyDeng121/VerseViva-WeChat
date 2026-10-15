@@ -9,6 +9,7 @@ from starlette.responses import Response
 
 from server.api.router import api_router
 from server.config import get_settings
+from server.release_audit import require_review
 from server.services.analysis_queue import AnalysisTaskQueue
 from server.services.anonymous_session import AnonymousSessionMiddleware
 from server.services.mix_jobs import MixJobs
@@ -20,6 +21,8 @@ from server.storage.job_store import JobStore
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     settings = get_settings()
+    if settings.release_review_required:
+        require_review(settings.release_review_file, glm_enabled=bool(settings.glm_api_key))
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     runtime_lock = RuntimeLock(settings.data_dir) if settings.resource_limits_enabled else None
     try:
