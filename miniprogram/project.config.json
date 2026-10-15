@@ -1,0 +1,8 @@
+{
+  "description": "VerseViva 声声不息微信小程序",
+  "miniprogramRoot": "dist/",
+  "projectname": "verseviva-wechat",
+  "compileType": "miniprogram",
+  "setting": { "es6": true, "minified": true, "urlCheck": true },
+  "packOptions": { "ignore": [], "include": [] }
+}

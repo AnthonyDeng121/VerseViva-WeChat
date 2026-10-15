@@ -23,6 +23,11 @@ data/
 *.flac
 web/node_modules/
 web/dist/
+miniprogram/node_modules/
+miniprogram/dist/
+miniprogram/.taro/
+miniprogram/.swc/
+miniprogram/project.private.config.json
 *.tsbuildinfo
 .idea/
 .vscode/

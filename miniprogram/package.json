@@ -1,0 +1,39 @@
+{
+  "name": "verseviva-miniprogram",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:weapp": "taro build --type weapp --watch",
+    "build:weapp": "taro build --type weapp",
+    "typecheck": "tsc --noEmit",
+    "check:package": "node scripts/check-package.cjs",
+    "test:shared": "node --test ../shared/audioTimeline.test.ts"
+  },
+  "dependencies": {
+    "@tarojs/components": "4.3.0",
+    "@tarojs/helper": "4.3.0",
+    "@tarojs/react": "4.3.0",
+    "@tarojs/runtime": "4.3.0",
+    "@tarojs/shared": "4.3.0",
+    "@tarojs/taro": "4.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "7.26.0",
+    "@babel/preset-react": "7.25.9",
+    "@tarojs/cli": "4.3.0",
+    "@tarojs/plugin-framework-react": "4.3.0",
+    "@tarojs/plugin-platform-weapp": "4.3.0",
+    "@tarojs/webpack5-runner": "4.3.0",
+    "@types/node": "22.10.2",
+    "@types/react": "18.3.18",
+    "babel-preset-taro": "4.3.0",
+    "react-refresh": "0.14.2",
+    "typescript": "5.7.3",
+    "webpack": "5.91.0"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  }
+}

@@ -1,0 +1,10 @@
+page { background: #f7f4ed; color: #243a32; font-size: 30px; }
+.page { padding: 40px 32px; }
+.eyebrow { display: block; font-size: 24px; color: #65766e; margin-bottom: 20px; }
+.title { display: block; font-size: 48px; font-weight: 700; margin-bottom: 24px; }
+.description { display: block; line-height: 1.8; margin-bottom: 36px; }
+.card { background: #fff; border-radius: 24px; padding: 32px; margin-bottom: 24px; }
+.card-title { display: block; font-weight: 600; margin-bottom: 16px; }
+.muted { display: block; color: #65766e; line-height: 1.8; }
+button { margin-top: 24px; background: #2c6951; color: #fff; font-size: 30px; border-radius: 16px; }
+button::after { border: 0; }
