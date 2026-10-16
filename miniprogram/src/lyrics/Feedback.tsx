@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Text, View } from '@tarojs/components';
 import type { Attempt, Memory } from '../network/api';
 import type { SongProfile } from '../../../shared/songTypes';
-import { comparisonLabel, confidenceLabel, projectLine, recommendationsForSentence } from './presentation';
-import { Disclosure } from '../ui/Disclosure';
+import { comparisonLabel, projectLine, recommendationsForSentence } from './presentation';
 
 export function Feedback({ attempt, profile, memory }: { attempt: Attempt; profile?: SongProfile; memory?: Memory | null }) {
   const [index, setIndex] = useState(0);
@@ -23,7 +22,6 @@ export function Feedback({ attempt, profile, memory }: { attempt: Attempt; profi
     : projectLine({ ...sentence, pronunciation: null }, lane).text : '';
   const recommendations = recommendationsForSentence(attempt, sentenceId);
   const comparison = attempt.sentenceComparisons?.[sentenceId];
-  const issues = attempt.status === 'analyzed' ? attempt.issues?.filter((issue) => issue.sentenceId === sentenceId) ?? [] : [];
   return <View className='practice-feedback'>
     <View className='practice-feedback-heading'>
       <Button className='hint-arrow' disabled={index === 0} onClick={() => setIndex(Math.max(0, index - 1))}>‹</Button>
@@ -35,11 +33,6 @@ export function Feedback({ attempt, profile, memory }: { attempt: Attempt; profi
           : recommendations.length ? <View className='practice-recommendations'>{recommendations.map((item, i) => <View key={i}>
             <Text className='card-title'>{item.headline}</Text><Text>{item.observation}</Text><Text className='practice-action'>下一遍：{item.action}</Text>
           </View>)}</View> : <Text className='practice-success'>本句暂无新的练习建议。</Text>}
-        {issues.length > 0 && <Disclosure title='查看本句证据与置信度'>
-          {issues.map((issue) => <View key={issue.issueId}><Text>{issue.wordText} · AI 录音观察 · {confidenceLabel(issue.confidence)}</Text>
-            {issue.audibleEvidence.map((item, i) => <Text key={i}>{item}</Text>)}</View>)}
-          {!!comparison?.lookbackAttemptCount && <Text>历史回看 {comparison.lookbackAttemptCount} 次可靠记录；只比较同句、同声部的相同目标。</Text>}
-        </Disclosure>}
       </View>
       <Button className='hint-arrow' disabled={index >= ids.length - 1} onClick={() => setIndex(Math.min(ids.length - 1, index + 1))}>›</Button>
     </View>
