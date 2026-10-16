@@ -1,6 +1,12 @@
 # VerseViva 声声不息 — Project Context
 
-## 2026-10-16 最新：独立 Demo 已部署
+## 2026-10-16 最新：V1.0.0 服务器已切换
+
+- 用户明确授权“切换”，14:43（Asia/Shanghai）运行镜像已切为 `verseviva-wechat-app:v1.0.0`，使用 `compose.wechat.v1.yaml` 和 0600 `.env.wechat.v1`。镜像与原 Demo 相同（`1a5ded1a4877`），配置逐字相同，代码和界面未改，微信数据卷保留，原站与 Caddy 未重启。
+- 容器 healthy；本机与服务器公网均验证新旧健康 200、三首 Hero Profile 200、伴奏 Range 206、无效 Bearer 401。未上传/审核/发布微信平台，真机闭环待用户扫码测试。
+- 内部发布检查仍关闭，正式 `.env.wechat` 和审核证据未改；V1 标签不代表隐私/供应商/注销清理缺项已完成。详见 `docs/wechat-v1-deployment.md`，下方 Demo 属历史状态。
+
+## 2026-10-16 历史：独立 Demo 已部署
 
 - 用户明确：未注销期间保留练习数据，核实注销申请后撤销登录并在七天内清理；不启用上传七天自动删除。完整注销清理机制尚未实现。隐私 TXT 已修正七天含义。
 - 用户要求暂不做年龄、地区限制，先测试 Demo。没有新增弹窗或界面修改；未启用的实验已归档到忽略目录 `.tmp/deferred-retention-access/`。
