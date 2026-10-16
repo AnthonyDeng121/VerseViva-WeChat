@@ -1,3 +1,0 @@
-FROM verseviva-wechat-app:v1.0.0
-ENV PYTHONPATH=/app
-COPY server/ /app/server/

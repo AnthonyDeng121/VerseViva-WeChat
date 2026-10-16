@@ -14,7 +14,6 @@ export default function Index() {
   const [title, setTitle] = useState(''); const [artist, setArtist] = useState(''); const [lyrics, setLyrics] = useState('');
   const [file, setFile] = useState<{ path: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  const [reviewName, setReviewName] = useState(''); const [reviewPassword, setReviewPassword] = useState('');
   useDidShow(() => refreshLibrary((value) => value + 1));
   function open(songId: string, mode: PageMode = 'technique') {
     void Taro.navigateTo({ url: `/pages/practice/index?songId=${songId}&mode=${mode}` });
@@ -88,17 +87,6 @@ export default function Index() {
       <Button className='text-button' onClick={() => Taro.navigateTo({ url: '/pages/memory/index' })}>练习记忆</Button>
       <Button className='text-button' onClick={() => Taro.navigateTo({ url: '/pages/practice/index?tasks=1' })}>恢复分析任务</Button>
     </View>
-    {auth.status !== 'authenticated' && <Disclosure title='测试账号登录'>
-      <View className='song-cache'>
-        <Text>账号</Text><Input value={reviewName} maxlength={64} onInput={(event) => setReviewName(event.detail.value)} />
-        <Text>密码</Text><Input password value={reviewPassword} maxlength={128} onInput={(event) => setReviewPassword(event.detail.value)} />
-        <Button className='secondary-button' disabled={!reviewName || !reviewPassword || auth.status === 'authenticating'} onClick={() => {
-          const password = reviewPassword; setReviewPassword(''); setError('');
-          void authSession.signInReview(reviewName.trim(), password).then(() => refreshLibrary((value) => value + 1))
-            .catch((reason) => setError(friendlyError(reason)));
-        }}>测试账号登录</Button>
-      </View>
-    </Disclosure>}
     {auth.error && <Text className='muted'>{auth.error}</Text>}
   </View>;
 }

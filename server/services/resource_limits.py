@@ -122,7 +122,7 @@ class ResourceLimitsMiddleware:
             await self.app(scope, receive, send)
             return
         state = scope.get("state", {})
-        if cfg.resource_wechat_only and state.get("auth_type") not in {"wechat", "review"}:
+        if cfg.resource_wechat_only and state.get("auth_type") != "wechat":
             await JSONResponse({"detail": "WeChat login required"}, 401)(scope, receive, send)
             return
         if self.gate.locked():
