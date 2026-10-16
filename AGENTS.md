@@ -1,5 +1,11 @@
 # VerseViva 声声不息 — Project Context
 
+## 2026-10-16 最新：真实模拟器与新预览已核验
+
+- 用户开启开发工具服务端口25668，已通过官方CLI和临时 miniprogram-automator 实际读页面节点、截图。确认原工具窗口确有旧显示且路径正确，新自动化会话载入最新内容；仅清理项目编译缓存，未清理用户存储。
+- 示例三首语言提示、技巧卡片无来源与复核/置信度已在模拟器实证；截图 `.tmp/live-home-languages.png`、`.tmp/live-technique-card.png`。新预览二维码 `.tmp/verified-preview.png` 已生成（预览包475029 bytes）。未发布或更新体验版，手机复验待用户扫码。
+- 练习首次请求间歇失败仍复现，后续微信request200且页面重试成功；网络根因未确定，不称完全修复。详见 `docs/miniprogram-streaming-playback.md`。
+
 ## 2026-10-16 最新：公共音频缓冲播放及第二轮卡片修正
 
 - 用户明确授权以后验证后直接 commit+push 到微信版 origin；此前不 push 约束被本条覆盖，原项目隔离及不得擅自改界面仍有效。
