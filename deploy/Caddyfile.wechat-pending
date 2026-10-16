@@ -1,0 +1,6 @@
+# Temporary HTTPS readiness response. No backend or audio is exposed.
+wechat-api.verseviva.top {
+    header Content-Type "text/plain; charset=utf-8"
+    header Cache-Control "no-store"
+    respond "VerseViva WeChat backend is not enabled yet. HTTPS is configured; API requests are unavailable." 503
+}

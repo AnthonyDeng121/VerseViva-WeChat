@@ -11,6 +11,7 @@
 
 ## 第十二项本地验收准备（2026-10-15，后续从实际联调前置条件继续）
 
+- 2026-10-16 最新：用户已填写 AppSecret，服务器存在性复查通过；确认 Google AI Studio 有有效计费账户、美区账户；确认三首商业 Hero 无授权。未复制素材、未绕过发布检查。已备份原 Caddy 配置、校验后热重载追加子域名临时 HTTPS 503 状态，原站点块保留；微信后台仍未启动，临时响应不能视为上线或健康通过。详见 `docs/miniprogram-server-preparation.md`，以下未改 Caddy/AppSecret 未填记录是此前状态。
 - 最新授权与状态：用户已明确要求一次性配置并检查服务器，允许推进微信版同机隔离部署；不 push、不改界面和保护原站继续有效。已经 SSH 检查并在新目录 `/home/ubuntu/verseviva-wechat` 准备源文件、0600 环境配置和同机 Compose，未启动微信容器、未修改现有 Caddy/原用户卷。原站配置了 Gemini 与 GLM Key；微信版 GLM 留空。AppSecret 需操作者在服务器运行 `deploy/configure_wechat_secret.py` 隐藏输入。正式发布证据仍阻挡启动，不绕过。详见 `docs/miniprogram-server-preparation.md`；不能沿用下文历史“不连接服务器”的状态，也不能宣称已部署。
 - 已新增 `docs/miniprogram-acceptance.md` 与 `docs/miniprogram-acceptance-record.md`，提供 P1–P7 准备顺序、N01–N09 正常闭环、A01–A09 异常/隔离用例及三次同步测量记录；实测字段留空，不将前次本地回归改记为新结果。
 - 本轮仅修改文档，核对链接、命令/API 入口、差异格式及客户端零变更；不重复运行已通过的整套回归、不跑 Hero Pipeline、不安装 Web 依赖、不启动服务或调用模型。只做本地中文 commit，不 push、不部署，不改界面。
