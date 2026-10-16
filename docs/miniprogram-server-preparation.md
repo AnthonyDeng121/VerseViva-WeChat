@@ -2,6 +2,10 @@
 
 ## 2026-10-16 最新核对与 HTTPS 准备
 
+- 最新完成：后台构建退出码 0，镜像 verseviva-wechat-app:local（ID 1a5ded1a4877），磁盘占用约 6.51 GB；导出 181 秒、解包 52.2 秒，合计 233.3 秒。先前导出无日志不是故障证据，按最新指令正常耗时步骤继续等待。镜像隔离检查通过：server.main 与 SDK 可导入，微信登录/AppSecret、Gemini、GLM、资源门禁和发布门禁配置生效；Demucs PyTorch 2.14.1+cpu、WhisperX PyTorch 2.8.0+cpu，cuda 均为 None。
+- 进行了少量固定合成文字的真实提供者检查，不发送用户音频、歌词或身份。Gemini Interactions store=False 返回成功。GLM 首次诊断 25 秒超时后，以原版 timeout=45 秒及 JSON 请求格式复查，45.08 秒 ReadTimeout；原版与新镜像的无凭证基础接口探测均快速返回预期 401（0.21/0.15 秒），说明端点网络可达，不将其称作生成成功或证明具体超时根因。保留原版 GLM 配置及代码中的失败回退，不修改原站。
+- 镜像内 release_audit --glm-enabled 返回 1：素材按运营者授权声明已不在阻挡列表；剩余为 privacy_contract、recording_consent、ai_disclosure、processor_regions、provider_terms_and_audience、deletion_and_backups、wechat_platform_setup 和 Gemini/GLM provider 核验。合法域名保存成功不代表整个平台隐私配置与真机授权完成，未伪造 pending 为 reviewed。微信后端仍未启动，HTTPS 临时 503 保留；原站健康复查仍 200。
+- 现有两处录音说明与临时上传、反馈保留及 GLM 数据流不一致；建议替换文本单列于 miniprogram-privacy-copy-review.md，未改界面。应用这类文案修正仍需用户按禁止擅改界面约束明确决定，且文案本身不能替代供应商/受众核验或必要授权流程。
 - 用户最新要求覆盖此前不启用 GLM 的决定：沿用原网页版有效 GLM 配置。已在服务器内部读取旧容器实际 Settings，复制并比对 Key、model、base_url、timeout 四项，确认一致；不打印值，AppSecret 保留，发布检查不变。隐私草稿重新加入 GLM 文字建议的数据说明，GLM 提供者/区域/条款仍需真实核对，不能因有 Key 即记作已审核。
 - Docker 首次构建暴露 Web 引用 shared 而 Dockerfile 未 COPY 的遗漏，已补 `COPY shared/ /app/shared/` 并传入共享源码后重新构建。未改界面；完整镜像构建与旧站镜像独立，不修改原站运行容器。
 - 安装阶段发现 Triton 大包后一度主动停止检查；核对原镜像确认 triton 3.8.0 是 WhisperX 声明的依赖，不据其存在推断 CUDA PyTorch 被安装。保留该依赖，新增 requirements-whisperx-cpu.txt 固定 CPU wheel，并在 Docker 构建中断言 torch.version.cuda is None 后重新构建，不静默删除原版能力。
