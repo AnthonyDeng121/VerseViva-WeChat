@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, ScrollView, Text, View } from '@tarojs/components';
 import type { LanguageHint, SongProfile, SongSentence, VocalPart } from '../../../shared/songTypes';
 import { alignVocalRows } from '../../../shared/audioTimeline';
-import { confidenceLabel, hintTarget, projectLine, sourceLabel } from './presentation';
+import { confidenceLabel, projectLine, sourceLabel } from './presentation';
 
 type Detail = { text: string; original: string; hints: LanguageHint[]; index: number };
 type DisplayLine = { text: string; original: string; hints: LanguageHint[] };
@@ -52,7 +52,7 @@ export function Lyrics({ profile, time, onSeek }: { profile: SongProfile; time: 
       hints: sentence.languageHints.filter((hint) => visible.has(hint.id)) };
   }
   return <View>
-    <View className='legend'><Text>× 吞音(不发音)</Text><Text>‿ 连读(改音)</Text><Text>└┘ 连读(二合一)</Text></View>
+    <View className='legend'><Text><Text className='legend-symbol'>×</Text> 吞音(不发音)</Text><Text><Text className='legend-symbol'>‿</Text> 连读(改音)</Text><Text><Text className='legend-symbol'>└┘</Text> 连读(二合一)</Text></View>
     {!!profile.vocalParts.length && <View className='lyrics-stage-heading'><View className='lyrics-mode-switch'>
       <Button className={mode === 'standard' ? 'active' : ''} onClick={() => { setMode('standard'); setDetail(null); }}>普通歌词</Button>
       <Button className={mode === 'layers' ? 'active' : ''} onClick={() => { setMode('layers'); setDetail(null); }}>双轨歌词</Button>
@@ -88,13 +88,13 @@ function HintDetail({ detail }: { detail: Detail }) {
   return <View className='hint-detail'>
     <Button className='hint-arrow' disabled={detail.hints.length < 2} onClick={() => setIndex((index - 1 + detail.hints.length) % detail.hints.length)}>‹</Button>
     <View className='hint-content'>
-      <View className='detail-heading'><Text className='technique-display'>{hintTarget(detail.text, hint)} {hint.marks.map((mark) => mark.symbol === '└─┘' ? '└┘' : mark.symbol).join(' ')}</Text><Text>{index + 1}/{detail.hints.length}</Text></View>
+      <View className='detail-heading'><TechniqueDisplay text={detail.text} hint={hint} /><Text>{index + 1}/{detail.hints.length}</Text></View>
       {detail.original !== detail.text && <View className='pronunciation-breakdown'>
-        <Text>原文：{detail.original}</Text><Text>辅助读音：{hint.canonicalPronunciation ?? detail.text}</Text>
-        {hint.observedPronunciation && <Text>演唱提示：{hint.observedPronunciation}</Text>}
+        <Text><Text className='hint-label'>原文：</Text>{detail.original}</Text><Text><Text className='hint-label'>辅助读音：</Text>{hint.canonicalPronunciation ?? detail.text}</Text>
+        {hint.observedPronunciation && <Text><Text className='hint-label'>演唱提示：</Text>{hint.observedPronunciation}</Text>}
       </View>}
-      <Text className='action'>建议：{explanation?.action || '建议待补充'}</Text>
-      <Text>专业分析：{explanation?.explanation || '解释待补充'}</Text>
+      <Text className='action'><Text className='hint-label'>建议：</Text>{explanation?.action || '建议待补充'}</Text>
+      <Text><Text className='hint-label'>专业分析：</Text>{explanation?.explanation || '解释待补充'}</Text>
       <Text className='text-button' onClick={() => setMetadata(!metadata)}>来源与复核 {metadata ? '▾' : '▸'}</Text>
       {metadata && <View className='review-note'>
         <Text>{sourceLabel(hint.source)} · {confidenceLabel(hint.confidence)}</Text>
@@ -103,5 +103,26 @@ function HintDetail({ detail }: { detail: Detail }) {
       </View>}
     </View>
     <Button className='hint-arrow' disabled={detail.hints.length < 2} onClick={() => setIndex((index + 1) % detail.hints.length)}>›</Button>
+  </View>;
+}
+
+// Match the H5 TechniqueDisplay: attach the mark beneath the final target
+// character, with the following word retained as context.
+function TechniqueDisplay({ text, hint }: { text: string; hint: LanguageHint }) {
+  const mark = hint.marks[0];
+  const symbol = mark?.symbol === '└─┘' ? '└┘' : mark?.symbol ?? '';
+  const words = Array.from(text.matchAll(/[A-Za-z]+(?:['’][A-Za-z]+)*/g));
+  const before = [...words].reverse().find((word) => (word.index ?? 0) <= (mark?.startCharIndex ?? 0));
+  const after = words.find((word) => (word.index ?? 0) > (mark?.startCharIndex ?? 0));
+  const left = Array.from(before?.[0] ?? (symbol === '×' ? '目标音' : ''));
+  const markClass = symbol === '×' ? 'elision' : symbol === '‿' ? 'boundary link' : 'boundary merge';
+  return <View className='technique-display'>
+    {left.map((character, index) => <View className='lyric-character' key={index}>
+      <Text>{character}</Text>{symbol && (index === left.length - 1 || (symbol === '×'
+        && left[left.length - 1]?.toLowerCase() === 'e' && index === left.length - 2))
+        && <Text className={`character-mark below ${markClass}`}>{symbol}</Text>}
+    </View>)}
+    {after && <Text className='technique-gap'> </Text>}
+    {after && Array.from(after[0]).map((character, index) => <View className='lyric-character' key={`after-${index}`}><Text>{character}</Text></View>)}
   </View>;
 }

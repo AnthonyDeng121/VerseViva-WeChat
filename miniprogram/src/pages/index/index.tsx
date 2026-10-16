@@ -69,7 +69,7 @@ export default function Index() {
     </Disclosure>
     <Disclosure title='示例歌曲'><View className='hero-shortcut'>
       <Text className='hero-description'>可以直接选择官方示例歌曲片段展示功能</Text>
-      {[['03', 'get him back!'], ['04', 'AS IF IT’S YOUR LAST'], ['05', '動物園は大変だ']].map(([suffix, label]) =>
+      {[['03', 'get him back!（英语）'], ['04', "AS IF IT'S YOUR LAST（韩语）"], ['05', '動物園は大変だ (日语)']].map(([suffix, label]) =>
         <Button className='secondary-button' key={suffix} onClick={() => open(`song_000000000000000000000000000000${suffix}`)}>{label}</Button>)}
     </View></Disclosure>
     <Disclosure title='已缓存歌曲'><View className='song-cache'>

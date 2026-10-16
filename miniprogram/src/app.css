@@ -527,3 +527,21 @@ text { line-height: 1.7; }
 .privacy-mask { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; padding: 64px; background: rgba(0,0,0,.6); }
 .card { padding: 28px; background: white; border-radius: 24px; }
 .privacy-mask button { margin-top: 24px; padding: 16px; color: #fff; background: #087e6b; }
+
+/* Preserve H5 button typography across native normal/disabled states. */
+.primary-button, .secondary-button, .sentence-loop-button {
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1.5; height: auto; font-family: inherit; font-size: 26px;
+}
+.primary-button[disabled] { color: #fff; background: #087e6b; }
+.secondary-button[disabled] { color: #087e6b; background: #fff; }
+.sentence-loop-button { flex-shrink: 0; font-size: 24px; }
+.sentence-loop-button[disabled] { color: #52615a; background: #fff; }
+.sentence-loop-button.active[disabled] { color: #fff; background: #087e6b; }
+.legend-symbol { color: #087e6b; font-weight: 800; }
+.hint-label { display: inline; font-size: inherit; line-height: inherit; font-weight: 700; }
+.hint-content .pronunciation-breakdown .hint-label { display: inline; }
+.hint-content .technique-display { color: #172026; font-weight: 700; line-height: 1.4; }
+.technique-display .lyric-character { vertical-align: baseline; }
+.technique-display .lyric-character > text { line-height: 1.4; }
+.technique-display .lyric-character > .character-mark { line-height: 1; }
