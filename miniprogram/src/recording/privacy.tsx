@@ -29,7 +29,7 @@ export function RecordingPrivacy() {
   if (!visible) return null;
   return <View className='privacy-mask'><View className='card'>
     <Text className='card-title'>录音用途与隐私</Text>
-    <Text className='muted'>录音先保存在本机；点击分析后上传，由后端 Gemini 服务提供演唱反馈。仅分析不保留云端录音；选择保存后可手动删除。请勿录入敏感或他人隐私信息。</Text>
+    <Text className='muted'>录音先保存在本机；提交分析或保存后会上传服务器。AI 分析会向 Google Gemini 发送必要音频片段和歌词目标，并可能由 GLM 根据结构化问题与练习趋势生成文字建议。仅分析正常完成后清理临时音频，保留练习反馈；中断时可能需要重试清理。已保存录音可手动删除，保留反馈的删除可联系 1435440580@qq.com。AI 反馈仅供练习参考，请勿录入敏感或他人隐私信息。第三方处理规则以已核实并公布的隐私指引为准。</Text>
     <Button onClick={() => Taro.openPrivacyContract({})}>查看隐私保护指引</Button>
     <Button id='recording-privacy-agree' openType='agreePrivacyAuthorization'
       onAgreePrivacyAuthorization={() => { pending?.({ event: 'agree', buttonId: 'recording-privacy-agree' }); pending = null; publish(); }}>同意并继续</Button>

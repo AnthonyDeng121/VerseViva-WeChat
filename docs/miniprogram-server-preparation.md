@@ -2,6 +2,7 @@
 
 ## 2026-10-16 最新核对与 HTTPS 准备
 
+- 用户已明确授权修正两处隐私说明，已应用候选文字；只修改说明文本，不改结构/样式/交互。真实设备文字显示、录音同意与平台最终指引仍需验证。server.release_audit 是项目自设启动检查，不代表微信官方提供的额外认证或收费流程；项目内部检查、平台审核和实际运行验收分别记录，不能混同。
 - 最新完成：后台构建退出码 0，镜像 verseviva-wechat-app:local（ID 1a5ded1a4877），磁盘占用约 6.51 GB；导出 181 秒、解包 52.2 秒，合计 233.3 秒。先前导出无日志不是故障证据，按最新指令正常耗时步骤继续等待。镜像隔离检查通过：server.main 与 SDK 可导入，微信登录/AppSecret、Gemini、GLM、资源门禁和发布门禁配置生效；Demucs PyTorch 2.14.1+cpu、WhisperX PyTorch 2.8.0+cpu，cuda 均为 None。
 - 进行了少量固定合成文字的真实提供者检查，不发送用户音频、歌词或身份。Gemini Interactions store=False 返回成功。GLM 首次诊断 25 秒超时后，以原版 timeout=45 秒及 JSON 请求格式复查，45.08 秒 ReadTimeout；原版与新镜像的无凭证基础接口探测均快速返回预期 401（0.21/0.15 秒），说明端点网络可达，不将其称作生成成功或证明具体超时根因。保留原版 GLM 配置及代码中的失败回退，不修改原站。
 - 镜像内 release_audit --glm-enabled 返回 1：素材按运营者授权声明已不在阻挡列表；剩余为 privacy_contract、recording_consent、ai_disclosure、processor_regions、provider_terms_and_audience、deletion_and_backups、wechat_platform_setup 和 Gemini/GLM provider 核验。合法域名保存成功不代表整个平台隐私配置与真机授权完成，未伪造 pending 为 reviewed。微信后端仍未启动，HTTPS 临时 503 保留；原站健康复查仍 200。
