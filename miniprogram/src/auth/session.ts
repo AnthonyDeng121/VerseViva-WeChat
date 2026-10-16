@@ -7,6 +7,7 @@ export type AuthSnapshot = {
 type Dependencies = {
   loginCode(): Promise<string>;
   exchange(code: string): Promise<unknown>;
+  exchangeReview?(username: string, password: string): Promise<unknown>;
   revoke(credentials: Credentials): Promise<void>;
   readHint(): unknown;
   writeHint(ownerId: string): void;
@@ -36,6 +37,7 @@ export class SessionManager implements AuthProvider {
   private pending: Promise<Credentials> | null = null;
   private generation = 0;
   private restored = false;
+  private reviewSession = false;
 
   constructor(private dependencies: Dependencies) {}
   current = () => this.credentials;
@@ -63,6 +65,7 @@ export class SessionManager implements AuthProvider {
   signIn(): Promise<Credentials> {
     if (this.pending) return this.pending;
     this.restored = true;
+    this.reviewSession = false;
     this.generation += 1;
     this.credentials = null;
     this.dependencies.invalidateRequests();
@@ -71,9 +74,31 @@ export class SessionManager implements AuthProvider {
   }
 
   refresh(): Promise<Credentials> {
+    if (this.reviewSession) return Promise.reject(new ApiError('authentication', '测试登录已到期，请重新输入测试账号密码。'));
     const expectedOwner = this.credentials?.ownerId;
     if (!expectedOwner) return Promise.reject(new ApiError('authentication', '请重新微信登录。'));
     return this.beginLogin(expectedOwner);
+  }
+
+  async signInReview(username: string, password: string): Promise<Credentials> {
+    if (!this.dependencies.exchangeReview) throw new ApiError('configuration', '测试账号登录不可用。');
+    const generation = ++this.generation;
+    this.restored = true; this.reviewSession = true;
+    this.credentials = null; this.pending = null; this.removeHint();
+    this.dependencies.invalidateRequests(); this.publish('authenticating');
+    try {
+      const value = parseLogin(await this.dependencies.exchangeReview(username, password));
+      if (generation !== this.generation) throw new ApiError('cancelled', '登录已取消。');
+      this.credentials = value; this.publish('authenticated');
+      // Neither the password nor reviewer credentials/hint are persisted.
+      return value;
+    } catch (error) {
+      if (generation === this.generation) {
+        this.credentials = null; this.dependencies.invalidateRequests();
+        this.publish('guest', friendlyError(error));
+      }
+      throw error;
+    }
   }
 
   private beginLogin(expectedOwner: string | null): Promise<Credentials> {

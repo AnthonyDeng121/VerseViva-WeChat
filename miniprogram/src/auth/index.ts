@@ -18,6 +18,16 @@ export const authSession = new SessionManager({
   },
   exchange: (code) => apiClient.request('POST', '/api/v1/auth/wechat/login',
     { access: 'public', data: { code } }).promise,
+  async exchangeReview(username, password) {
+    try {
+      return await apiClient.request('POST', '/api/v1/auth/review/login',
+        { access: 'public', data: { username, password } }).promise;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) throw new ApiError('authentication', '测试账号或密码错误。');
+      if (error instanceof ApiError && error.status === 404) throw new ApiError('authentication', '测试账号未开放或已到期。');
+      throw error;
+    }
+  },
   async revoke(credentials) {
     // Revoke the captured token, never trigger a fresh login just to log out.
     const client = new ApiClient(VERSEVIVA_API_ORIGIN, taroTransport);

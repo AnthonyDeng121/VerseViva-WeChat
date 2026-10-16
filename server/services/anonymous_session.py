@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from server.config import get_settings
+from server.services import review_login
 from server.storage.wechat_store import WeChatIdentityStore
 
 COOKIE_NAME = "verseviva_session"
@@ -53,10 +54,17 @@ class AnonymousSessionMiddleware(BaseHTTPMiddleware):
             settings = get_settings()
             parts = authorization.split()
             owner_id = None
+            auth_type = "wechat"
             if settings.wechat_login_enabled and len(parts) == 2 and parts[0].lower() == "bearer":
                 owner_id = WeChatIdentityStore(settings.data_dir).resolve(
                     parts[1], settings.wechat_app_id
                 )
+            if (owner_id is None and review_login.enabled(settings) and len(parts) == 2
+                    and parts[0].lower() == "bearer"):
+                owner_id = WeChatIdentityStore(settings.data_dir).resolve(
+                    parts[1], review_login.namespace(settings)
+                )
+                auth_type = "review"
             if owner_id is None:
                 return JSONResponse(
                     {"detail": "登录已过期或无效，请重新登录。"},
@@ -65,7 +73,7 @@ class AnonymousSessionMiddleware(BaseHTTPMiddleware):
                 )
             # Bearer takes precedence: never replace it with an anonymous Cookie.
             request.state.session_id = owner_id
-            request.state.auth_type = "wechat"
+            request.state.auth_type = auth_type
             response = await call_next(request)
             response.headers["Cache-Control"] = "no-store"
             return response

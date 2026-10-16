@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     wechat_app_secret: SecretStr | None = None
     wechat_login_timeout_seconds: float = Field(default=10, gt=0, le=30)
     wechat_token_ttl_seconds: int = Field(default=7200, ge=60, le=86400)
+    review_login_enabled: bool = False
+    review_username: str = ""
+    review_password_hash: SecretStr | None = None
+    review_login_expires_at: int = 0
     demucs_executable: Path = Path(".venv-demucs/bin/demucs")
     demucs_model: str = "htdemucs"
     whisperx_executable: Path = Path(".venv-whisperx/bin/whisperx")

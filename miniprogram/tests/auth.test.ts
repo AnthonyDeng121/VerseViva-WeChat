@@ -8,6 +8,30 @@ const bob = 'wxuser_' + 'b'.repeat(32);
 const payload = (owner = alice, token = 'a') => ({ ownerId: owner,
   accessToken: 'vwx1.' + token.repeat(43), tokenType: 'Bearer', expiresAtMs: Date.now() + 3600_000 });
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+test('review login keeps password and identity out of persistence and never renews with wx.login', async () => {
+  let saved = 0; let loginCodes = 0;
+  const session = new SessionManager({
+    async loginCode() { loginCodes++; return 'code'; }, async exchange() { return payload(); },
+    async exchangeReview(username, password) { assert.equal(username, 'reviewer'); assert.equal(password, 'secret'); return payload(); },
+    async revoke() {}, readHint: () => undefined, writeHint() { saved++; }, removeHint() {}, invalidateRequests() {},
+  });
+  await session.signInReview('reviewer', 'secret');
+  assert.equal(session.getSnapshot().status, 'authenticated'); assert.equal(saved, 0);
+  await assert.rejects(session.refresh()); assert.equal(loginCodes, 0);
+  await session.signOut(); assert.equal(session.current(), null);
+});
+
+test('late reviewer login cannot revive an account after logout', async () => {
+  let finish!: (value: unknown) => void;
+  const session = new SessionManager({
+    async loginCode() { return 'code'; }, async exchange() { return payload(); },
+    exchangeReview: () => new Promise((resolve) => { finish = resolve; }),
+    async revoke() {}, readHint: () => undefined, writeHint() {}, removeHint() {}, invalidateRequests() {},
+  });
+  const pending = session.signInReview('reviewer', 'secret'); await session.signOut();
+  finish(payload()); await assert.rejects(pending); assert.equal(session.current(), null);
+});
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
