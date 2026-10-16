@@ -3,6 +3,7 @@ WORKDIR /app/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+COPY shared/ /app/shared/
 RUN npm run build
 
 FROM python:3.11-slim-bookworm AS runtime
@@ -20,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY requirements-demucs.txt requirements-whisperx.txt ./
+COPY requirements-demucs.txt requirements-whisperx.txt requirements-whisperx-cpu.txt ./
 
 # Keep the large, rarely changed model environments independent from application
 # source so ordinary backend edits can reuse this layer.
@@ -34,7 +35,9 @@ RUN python -m pip install --upgrade pip setuptools wheel \
     && /opt/verseviva/whisperx/bin/pip install \
       --index-url https://download.pytorch.org/whl/cpu \
       torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 \
-    && /opt/verseviva/whisperx/bin/pip install -r requirements-whisperx.txt
+    && /opt/verseviva/whisperx/bin/pip install \
+      -c requirements-whisperx-cpu.txt -r requirements-whisperx.txt \
+    && /opt/verseviva/whisperx/bin/python -c "import torch; assert torch.version.cuda is None"
 
 COPY pyproject.toml ./
 COPY server ./server

@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-10-16",
+  "operator": "邓宇轩",
+  "materialAuthorization": {
+    "status": "operator_attested",
+    "statement": "运营者确认已取得现有歌曲片段授权，并要求按已授权继续项目；授权人要求不向助手披露私人证明。",
+    "evidenceCustody": "operator_private_custody",
+    "independentlyVerified": false,
+    "note": "未查看授权文件，不独立认证许可范围、有效期或法律效力。"
+  },
+  "wechatDomains": {
+    "status": "operator_confirmed_saved",
+    "origin": "https://wechat-api.verseviva.top",
+    "types": ["request", "uploadFile", "downloadFile"],
+    "deviceVerified": false
+  }
+}

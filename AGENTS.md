@@ -11,6 +11,8 @@
 
 ## 第十二项本地验收准备（2026-10-15，后续从实际联调前置条件继续）
 
+- 本轮最新停止点：Dockerfile shared 复制、CPU wheel 约束已修复；完整构建各安装阶段及 CPU 断言通过，但 exporting layers 持续无进展，镜像标签未生成。已按用户异常长命令约束停止微信 docker build，等待用户手动继续，不自动重试。原站健康仍 200；微信入口仍临时 503、服务未启动。隐私/发布定向 25 项通过，未做实际 GLM/Gemini 请求。最新 GLM 已恢复为与原版四项一致，素材按私人保管的运营者授权声明记录。
+- 2026-10-16 最新决定覆盖此前 GLM 留空/无授权记录：用户确认已取得三首素材授权，证明因授权人隐私要求由用户私下保管，接受运营者声明继续，不索要文件、不伪称独立核验。用户确认三个合法域名已保存。用户随后明确要求沿用原版 GLM 有效配置；服务器已内部复制并逐项比对 Key/model/base_url/timeout 四项，全部一致，AppSecret 保留、发布检查仍开启。隐私草稿已补回 GLM 处理说明，不能继续声称未启用。三首 Hero 的 18 个必要文件已只读复制到微信版独立准备目录并校验，未复制用户库。Docker 构建发现 Web 阶段遗漏 shared，已补 COPY，页面源码未改。
 - 2026-10-16 最新：用户已填写 AppSecret，服务器存在性复查通过；确认 Google AI Studio 有有效计费账户、美区账户；确认三首商业 Hero 无授权。未复制素材、未绕过发布检查。已备份原 Caddy 配置、校验后热重载追加子域名临时 HTTPS 503 状态，原站点块保留；微信后台仍未启动，临时响应不能视为上线或健康通过。详见 `docs/miniprogram-server-preparation.md`，以下未改 Caddy/AppSecret 未填记录是此前状态。
 - 最新授权与状态：用户已明确要求一次性配置并检查服务器，允许推进微信版同机隔离部署；不 push、不改界面和保护原站继续有效。已经 SSH 检查并在新目录 `/home/ubuntu/verseviva-wechat` 准备源文件、0600 环境配置和同机 Compose，未启动微信容器、未修改现有 Caddy/原用户卷。原站配置了 Gemini 与 GLM Key；微信版 GLM 留空。AppSecret 需操作者在服务器运行 `deploy/configure_wechat_secret.py` 隐藏输入。正式发布证据仍阻挡启动，不绕过。详见 `docs/miniprogram-server-preparation.md`；不能沿用下文历史“不连接服务器”的状态，也不能宣称已部署。
 - 已新增 `docs/miniprogram-acceptance.md` 与 `docs/miniprogram-acceptance-record.md`，提供 P1–P7 准备顺序、N01–N09 正常闭环、A01–A09 异常/隔离用例及三次同步测量记录；实测字段留空，不将前次本地回归改记为新结果。

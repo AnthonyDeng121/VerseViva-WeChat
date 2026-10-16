@@ -1,0 +1,4 @@
+# Preserve the CPU wheels when resolving WhisperX transitive dependencies.
+torch==2.8.0+cpu
+torchaudio==2.8.0+cpu
+torchvision==0.23.0+cpu

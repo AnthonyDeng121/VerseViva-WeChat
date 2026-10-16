@@ -2,6 +2,13 @@
 
 ## 2026-10-16 最新核对与 HTTPS 准备
 
+- 用户最新要求覆盖此前不启用 GLM 的决定：沿用原网页版有效 GLM 配置。已在服务器内部读取旧容器实际 Settings，复制并比对 Key、model、base_url、timeout 四项，确认一致；不打印值，AppSecret 保留，发布检查不变。隐私草稿重新加入 GLM 文字建议的数据说明，GLM 提供者/区域/条款仍需真实核对，不能因有 Key 即记作已审核。
+- Docker 首次构建暴露 Web 引用 shared 而 Dockerfile 未 COPY 的遗漏，已补 `COPY shared/ /app/shared/` 并传入共享源码后重新构建。未改界面；完整镜像构建与旧站镜像独立，不修改原站运行容器。
+- 安装阶段发现 Triton 大包后一度主动停止检查；核对原镜像确认 triton 3.8.0 是 WhisperX 声明的依赖，不据其存在推断 CUDA PyTorch 被安装。保留该依赖，新增 requirements-whisperx-cpu.txt 固定 CPU wheel，并在 Docker 构建中断言 torch.version.cuda is None 后重新构建，不静默删除原版能力。
+- 最终本轮验证：隐私/发布定向测试 25 项通过（3.74 秒）、Ruff、JSON 与 diff 检查通过；隐私 TXT 为有效 UTF-8 且小于 100 KB。第三次完整构建的 Web、模型环境安装、CPU 断言及应用安装步骤全部完成，但卡在 exporting layers，数次检查无日志进展且镜像标签未生成。一次 SSH 检查连接关闭，随后重连原站健康返回 200。按用户对异常长时间无进展命令的约束，已向本次微信 docker build 发送 SIGINT 停止，不无限重试，等待用户手动继续。没有启动微信服务、没有将 503 路由改为 API 转发，不能称镜像完整构建成功或部署完成。服务器保留 `build-wechat.log` 供后续定位，不重跑 Hero Pipeline。
+- 用户随后确认已取得素材授权，因授权人隐私要求不披露证明，并要求按已授权继续。以最新陈述覆盖此前无授权状态；记录为 operator attestation、私人保管、未独立核验，不索要私人文件。`deploy/wechat-operator-attestations.json` 仅记录确认事实，实际授权文件不进仓库。服务器单独 `release-review.operator.json` 的素材条目按用户授权声明记录实际项目用途，标记 independentlyVerified=false；其余审核条目仍 pending，样例清单未改为通过。
+- 三首 Hero 的 18 个指定文件已从旧容器只读复制到微信版 `hero-staging`，38427386 bytes，生成 SHA-256 清单；没有复制原站数据库、用户录音或会话密钥，尚未公开这些文件。用户另确认微信三个合法域名已保存成功，真机访问尚待测。
+- Docker 构建忽略新增 `.env.*`、PEM、临时目录、客户端产物及准备资源/操作记录，防止密钥或无关资源进入构建上下文。
 - AppSecret 已由用户在服务器隐藏输入；复查仅输出存在性，确认已配置，GLM 为空，发布检查仍开启。
 - 用户确认 Google AI Studio 已关联有效计费账户、美区 Google 账户。此为用户提供的信息；付款方式不写入公开隐私文档，不据此推断实际服务主体、处理区域或大陆/未成年人适用性。
 - 用户明确三首歌曲片段没有授权，不能把旧站缓存当作公开发布许可，素材审核继续未通过；未复制歌曲或运行 Hero Pipeline。
