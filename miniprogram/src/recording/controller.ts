@@ -121,7 +121,9 @@ export class RecorderController {
     try {
       await this.dependencies.authorize(); if (!valid()) return;
       this.update({ phase: 'preloading' }); await this.dependencies.prepare(selection);
-      if (!valid()) { this.dependencies.stopReference(); return; }
+      // Cancellation already stopped this generation. A late preparation must
+      // not reset a newer recording attempt's player.
+      if (!valid()) return;
       for (let count = 3; count > 0; count -= 1) {
         this.update({ phase: 'countdown', countdown: count });
         await new Promise<void>((resolve) => { this.countdownResolve = resolve; this.timer = this.delay(1000, resolve); });

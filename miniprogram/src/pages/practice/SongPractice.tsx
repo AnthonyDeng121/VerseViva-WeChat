@@ -8,7 +8,7 @@ import type { SongProfile } from '../../../../shared/songTypes';
 import { buildTrackSlotId } from '../../../../shared/audioTimeline';
 import type { RecordingSelection } from '../../recording/controller';
 import { RecordingPanel } from '../../recording/RecordingPanel';
-import { usePlayer, useRecording } from '../../recording/runtime';
+import { recordingReferences, usePlayer, useRecording } from '../../recording/runtime';
 import { SavedTakes } from '../../recording/SavedTakes';
 import { ReferenceControls, type ReferenceHandle } from '../../audio/ReferenceControls';
 import { Lyrics } from '../../lyrics/Lyrics';
@@ -19,7 +19,8 @@ import { practiceOptions, recordingMode, formatTime } from '../../ui/practiceLay
 
 export function SongPractice({ songId, initialMode = 'technique' }: { songId: string; initialMode?: 'technique' | 'sing' }) {
   const owner = useAuth().ownerId; const recording = useRecording(); const playback = usePlayer();
-  const [mode, setMode] = useState<PageMode>(initialMode);
+  const [requestedMode, setMode] = useState<PageMode>(initialMode);
+  const mode = recordingMode(recording.phase) ?? requestedMode;
   const [latency, setLatency] = useState(0); const [calibrated, setCalibrated] = useState(false);
   const [profile, setProfile] = useState<SongProfile | null>(null);
   const [error, setError] = useState(''); const [revision, setRevision] = useState(0);
@@ -29,6 +30,13 @@ export function SongPractice({ songId, initialMode = 'technique' }: { songId: st
   const [reference, setReference] = useState<'source' | 'accompaniment'>('accompaniment');
   const referenceHandle = useRef<ReferenceHandle>(null);
   useEffect(() => {
+    recordingReferences.reset();
+    return () => recordingReferences.reset();
+  }, [songId, owner]);
+  useEffect(() => {
+    if (owner && profile) void recordingReferences.warm(songId, reference).catch(() => {});
+  }, [songId, owner, !!profile, reference]);
+  useEffect(() => {
     let live = true; setProfile(null); setError(''); const operation = songApi.profile(songId);
     void operation.promise.then((value) => { if (live) { setProfile(value); setStart(0); setEnd(0);
       rememberSong(owner, { songId, title: value.title }); } })
@@ -36,6 +44,12 @@ export function SongPractice({ songId, initialMode = 'technique' }: { songId: st
     return () => { live = false; operation.abort(); };
   }, [songId, owner, revision]);
   useEffect(() => { const next = recordingMode(recording.phase); if (next) setMode(next); }, [recording.phase]);
+  const showRecordingLyrics = ['countdown', 'starting', 'recording'].includes(recording.phase);
+  useEffect(() => {
+    if (showRecordingLyrics) Taro.nextTick(() => {
+      void Taro.pageScrollTo({ selector: '.profile-card', duration: 0 }).catch(() => {});
+    });
+  }, [showRecordingLyrics]);
   const options = useMemo(() => profile ? practiceOptions(profile, lane) : [], [profile, lane]);
   const safeStart = Math.min(start, Math.max(options.length - 1, 0));
   const safeEnd = Math.max(safeStart, Math.min(end, Math.max(options.length - 1, 0)));

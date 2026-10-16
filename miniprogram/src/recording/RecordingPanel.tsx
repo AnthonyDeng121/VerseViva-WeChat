@@ -77,7 +77,6 @@ export function RecordingPanel({ selection, language, profile, freeOverdub = fal
     {work.phase === 'done' && <Text className='card-title'>{work.attempt?.status === 'failed' ? '本次分析未完成，请重新练习。'
       : work.attempt?.status === 'insufficient_data' ? '这次录音证据不足，请重新录制。' : work.mode === 'save_only' ? '录音已保存' : '处理完成，可在练习记忆中查看记录。'}</Text>}
     {work.attempt && <Feedback attempt={work.attempt} profile={profile} memory={memory} />}
-    <Text className='recording-purpose-note'>提交分析或保存会上传录音。AI 分析涉及 Gemini 音频处理及可选 GLM 文字建议。仅分析完成后清理临时音频并保留反馈，中断时可能需重试清理；保存录音可删除。AI 反馈仅供练习参考。</Text>
     <RecordingPrivacy />
   </View>;
 }

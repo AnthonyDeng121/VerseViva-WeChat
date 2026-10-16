@@ -5,6 +5,7 @@ import { PracticeWorkflow, type Checkpoint } from '../src/recording/workflow.ts'
 import { ApiError } from '../src/network/client.ts';
 import type { Attempt } from '../src/network/api.ts';
 import { syncEvidence } from '../src/recording/sync.ts';
+import { RecordingReferences } from '../src/recording/referenceCache.ts';
 
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 const selection: RecordingSelection = { songId: 'song_' + 'a'.repeat(32), sentenceIds: ['sentence_1'],
@@ -13,20 +14,21 @@ const selection: RecordingSelection = { songId: 'song_' + 'a'.repeat(32), senten
 function setup(options: { authorize?: () => Promise<void>; prepare?: () => Promise<void>; referenceStarts?: boolean; startThrowsOnce?: boolean } = {}) {
   let start!: () => void; let stop!: Parameters<RecorderDriver['onStop']>[0];
   let interrupt!: () => void; let error!: () => void;
-  let starts = 0; let plays = 0; let owner = 'alice';
+  let starts = 0; let plays = 0; let referenceStops = 0; let owner = 'alice';
   const removed: string[] = []; const timers = new Map<number, () => void>(); let serial = 0;
   const controller = new RecorderController({
     driver: () => ({ start() { starts += 1; if (options.startThrowsOnce && starts === 1) throw new Error('native start failed'); }, stop() {}, onStart: (fn) => { start = fn; },
       onStop: (fn) => { stop = fn; }, onError: (fn) => { error = fn; }, onInterruption: (fn) => { interrupt = fn; } }),
     owner: () => owner, authorize: options.authorize ?? (async () => {}),
     prepare: options.prepare ?? (async () => {}), playReference() { plays += 1;
-      if (options.referenceStarts !== false) controller.referenceStarted(selection.selectionStartSeconds); }, stopReference() {},
+      if (options.referenceStarts !== false) controller.referenceStarted(selection.selectionStartSeconds); }, stopReference() { referenceStops++; },
     async remove(path) { removed.push(path); },
     delay(_, fn) { timers.set(++serial, fn); return serial as unknown as ReturnType<typeof setTimeout>; },
     cancel(handle) { timers.delete(handle as unknown as number); },
   });
   const tick = async () => { const first = [...timers.entries()][0]; assert.ok(first); timers.delete(first[0]); first[1](); await flush(); };
   return { controller, tick, timers, removed, starts: () => starts, plays: () => plays,
+    referenceStops: () => referenceStops,
     start: () => start(), stop: (valid = true) => stop({ tempFilePath: 'wxfile://recording.mp3', duration: valid ? 2000 : 0, fileSize: valid ? 128 : 0 }),
     interrupt: () => interrupt(), error: () => error(), setOwner: (value: string) => { owner = value; } };
 }
@@ -50,6 +52,46 @@ test('permission refusal and preload failure never call native start', async () 
     await h.controller.start(selection); assert.equal(h.starts(), 0);
     assert.equal(h.controller.getSnapshot().phase, 'error');
   }
+});
+
+test('cancelled slow preparation cannot stop a newer recording attempt', async () => {
+  let finish!: () => void; let calls = 0;
+  const h = setup({ prepare: () => ++calls === 1 ? new Promise<void>((resolve) => { finish = resolve; }) : Promise.resolve() });
+  const old = h.controller.start(selection); await flush();
+  assert.equal(h.controller.getSnapshot().phase, 'preloading');
+  h.controller.interrupt();
+  const next = h.controller.start(selection); await flush();
+  assert.equal(h.controller.getSnapshot().phase, 'countdown');
+  const stops = h.referenceStops(); finish(); await old;
+  assert.equal(h.referenceStops(), stops);
+  await h.tick(); await h.tick(); await h.tick(); await next;
+  h.start(); assert.equal(h.controller.getSnapshot().phase, 'recording');
+  h.controller.stop(); h.stop(); h.controller.discard();
+});
+
+test('recording prefetch shares pending download and reuses local audio across rerecordings', async () => {
+  let downloads = 0; let deleted = 0; let revoked = () => {};
+  let finish!: (lease: import('../src/audio/downloads.ts').AudioLease) => void;
+  const refs = new RecordingReferences(() => { downloads++; return {
+    promise: new Promise((resolve) => { finish = resolve; }), abort() {},
+  }; });
+  const warm = refs.warm(selection.songId, 'accompaniment');
+  const first = refs.acquire(selection.songId, 'accompaniment');
+  finish({ path: 'wxfile://backing', release() { deleted++; revoked(); }, onRelease(fn) { revoked = fn; return () => {}; } });
+  await warm; const lease = await first; lease.release();
+  const again = await refs.acquire(selection.songId, 'accompaniment');
+  assert.equal(again.path, 'wxfile://backing'); assert.equal(downloads, 1); assert.equal(deleted, 0);
+  refs.reset(); assert.equal(deleted, 1); assert.throws(() => again.path);
+});
+
+test('recording prefetch failure is retryable and reset rejects late files', async () => {
+  let attempts = 0; let deleted = 0; let finish!: (lease: import('../src/audio/downloads.ts').AudioLease) => void;
+  const refs = new RecordingReferences(() => ({ promise: ++attempts === 1 ? Promise.reject(new Error('offline'))
+    : new Promise((resolve) => { finish = resolve; }), abort() {} }));
+  await assert.rejects(refs.warm(selection.songId, 'source'));
+  const later = refs.acquire(selection.songId, 'source'); refs.reset();
+  finish({ path: 'wxfile://late', release() { deleted++; }, onRelease() { return () => {}; } });
+  await assert.rejects(later); assert.equal(deleted, 1); assert.equal(attempts, 2);
 });
 test('synchronous native start failure clears provisional recording and permits a new attempt', async () => {
   const h = setup({ startThrowsOnce: true }); await requestStart(h);

@@ -6,11 +6,12 @@ import { LocalPlayer } from '../audio/player';
 import { taroTransport } from '../network/taroTransport';
 import { RecorderController } from './controller';
 import { authorizeRecording, cancelPrivacy } from './privacy';
-import type { Operation } from '../network/client';
-import type { AudioLease } from '../audio/downloads';
+import { RecordingReferences } from './referenceCache';
 
 export const player = new LocalPlayer(() => Taro.createInnerAudioContext());
-let preparing: Operation<AudioLease> | null = null;
+export const recordingReferences = new RecordingReferences((resource) => audioResources.acquire(resource));
+audioResources.onReset(() => recordingReferences.reset());
+let preparationGeneration = 0;
 export const recorder = new RecorderController({
   owner: () => authSession.getSnapshot().ownerId,
   authorize: authorizeRecording,
@@ -25,17 +26,17 @@ export const recorder = new RecorderController({
     };
   },
   async prepare(selection) {
+    const generation = ++preparationGeneration;
     player.lock('recording');
-    const operation = audioResources.acquire({ kind: 'reference', songId: selection.songId, asset: selection.recordingReference ?? 'accompaniment' });
-    preparing = operation;
-    const lease = await operation.promise;
-    if (preparing === operation) preparing = null;
+    const lease = await recordingReferences.acquire(selection.songId, selection.recordingReference ?? 'accompaniment');
+    if (generation !== preparationGeneration) { lease.release(); return; }
     try { await player.load(lease, selection.selectionStartSeconds, 'recording', 0); }
-    catch (error) { lease.release(); player.unlock('recording'); throw error; }
-    await player.seek(selection.selectionStartSeconds, 'recording');
+    catch (error) { lease.release(); throw error; }
+    // Native startTime applies when playback begins. Paused seek may not emit
+    // onSeeked on devices; onPlay still verifies the actual recording start.
   },
   playReference: () => player.play('recording'),
-  stopReference() { preparing?.abort(); preparing = null; player.unlock('recording'); player.reset(); },
+  stopReference() { preparationGeneration++; player.unlock('recording'); player.reset(); },
   remove: (path) => taroTransport.removeTempFile(path),
 });
 player.onEvent((event) => {
