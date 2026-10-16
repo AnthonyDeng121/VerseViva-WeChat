@@ -94,7 +94,7 @@ export class LocalPlayer {
       const timer = setTimeout(() => {
         if (current()) this.update({ phase: 'error', error: '音频准备超时，请重新加载。' });
         finish(new ApiError('timeout', '音频准备超时，请重新加载。'));
-      }, 15000);
+      }, /^https:\/\//i.test(lease.path) ? 60000 : 15000);
       this.loadReject = (error) => finish(error);
       audio.onCanplay(() => { if (current() && !settled) { this.update({ phase: 'ready' }); finish(); } });
       audio.onError(() => {

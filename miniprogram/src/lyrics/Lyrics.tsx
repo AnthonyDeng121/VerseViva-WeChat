@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, ScrollView, Text, View } from '@tarojs/components';
 import type { LanguageHint, SongProfile, SongSentence, VocalPart } from '../../../shared/songTypes';
 import { alignVocalRows } from '../../../shared/audioTimeline';
-import { confidenceLabel, projectLine, sourceLabel } from './presentation';
+import { projectLine } from './presentation';
 
 type Detail = { text: string; original: string; hints: LanguageHint[]; index: number };
 type DisplayLine = { text: string; original: string; hints: LanguageHint[] };
@@ -82,7 +82,7 @@ export function Lyrics({ profile, time, onSeek }: { profile: SongProfile; time: 
 }
 
 function HintDetail({ detail }: { detail: Detail }) {
-  const [index, setIndex] = useState(detail.index); const [metadata, setMetadata] = useState(false);
+  const [index, setIndex] = useState(detail.index);
   const hint = detail.hints[index]; if (!hint) return null;
   const explanation = hint.details.find((item) => item.locale === 'zh-CN') ?? hint.details[0];
   return <View className='hint-detail'>
@@ -95,12 +95,6 @@ function HintDetail({ detail }: { detail: Detail }) {
       </View>}
       <Text className='action'><Text className='hint-label'>建议：</Text>{explanation?.action || '建议待补充'}</Text>
       <Text><Text className='hint-label'>专业分析：</Text>{explanation?.explanation || '解释待补充'}</Text>
-      <Text className='text-button' onClick={() => setMetadata(!metadata)}>来源与复核 {metadata ? '▾' : '▸'}</Text>
-      {metadata && <View className='review-note'>
-        <Text>{sourceLabel(hint.source)} · {confidenceLabel(hint.confidence)}</Text>
-        <Text>{hint.evidence.needsHumanReview === true ? '需要人工复核' : hint.evidence.needsHumanReview === false ? '未标记为待复核' : '复核状态未知'}</Text>
-        <Text>证据强度：{({ strong: '较强', moderate: '中等', medium: '中等', weak: '较弱' }[hint.evidence.evidenceStrength ?? ''] ?? '未标注')}</Text>
-      </View>}
     </View>
     <Button className='hint-arrow' disabled={detail.hints.length < 2} onClick={() => setIndex((index + 1) % detail.hints.length)}>›</Button>
   </View>;

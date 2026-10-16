@@ -4,6 +4,37 @@ import { AudioDownloads, resourceRequest, PUBLIC_HERO_IDS } from '../src/audio/d
 
 const song = 'song_' + 'a'.repeat(32);
 const take = 'take_' + 'b'.repeat(32);
+
+test('public reference playback streams without download and reset revokes the URL lease', async () => {
+  let downloads = 0; const removed: string[] = [];
+  const resources = new AudioDownloads({
+    download: () => { downloads++; return { promise: Promise.resolve('wxfile://local'), abort() {} }; },
+    async remove(path) { removed.push(path); }, credentials: () => null,
+    publicUrl: (path) => 'https://example.com' + path,
+  });
+  const operation = resources.acquire({ kind: 'reference', songId: [...PUBLIC_HERO_IDS][0], asset: 'source' }, { stream: true });
+  const lease = await operation.promise;
+  assert.match(lease.path, /^https:\/\/example.com\/api\/v1\/songs\//);
+  assert.equal(downloads, 0);
+  let revoked = 0; lease.onRelease(() => revoked++);
+  resources.reset();
+  assert.equal(revoked, 1); assert.throws(() => lease.path);
+  assert.deepEqual(removed, []);
+});
+
+test('stream request cannot expose private audio and recording reference still downloads', async () => {
+  let downloads = 0;
+  const resources = new AudioDownloads({
+    download: () => { downloads++; return { promise: Promise.resolve('wxfile://local'), abort() {} }; },
+    async remove() {}, credentials: () => ({ ownerId: 'alice', expiresAtMs: Date.now() + 60000 }),
+    publicUrl: () => { throw new Error('private URL must not be issued'); },
+  });
+  const privateLease = await resources.acquire({ kind: 'reference', songId: song, asset: 'source' }, { stream: true }).promise;
+  assert.equal(privateLease.path, 'wxfile://local'); privateLease.release();
+  const recordingLease = await resources.acquire({ kind: 'reference', songId: [...PUBLIC_HERO_IDS][0], asset: 'accompaniment' }).promise;
+  assert.equal(recordingLease.path, 'wxfile://local'); recordingLease.release();
+  assert.equal(downloads, 2);
+});
 test('reference, take and mix downloads derive only authorized same-origin paths, never token URLs', () => {
   assert.equal(resourceRequest({ kind: 'reference', songId: [...PUBLIC_HERO_IDS][0], asset: 'vocals' }).access, 'public');
   assert.equal(resourceRequest({ kind: 'reference', songId: song, asset: 'vocals' }).access, 'private');

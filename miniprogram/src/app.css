@@ -545,3 +545,5 @@ text { line-height: 1.7; }
 .technique-display .lyric-character { vertical-align: baseline; }
 .technique-display .lyric-character > text { line-height: 1.4; }
 .technique-display .lyric-character > .character-mark { line-height: 1; }
+.technique-display .character-mark.elision { margin-left: -.18em; }
+.technique-display .character-mark.boundary.link { margin-left: -.3em; }

@@ -29,7 +29,7 @@ export const ReferenceControls = forwardRef<ReferenceHandle, {
     cancel(); const current = generation.current; setBusy(true); setError('');
     try {
       if (loadedVersion.current !== player.getVersion() || player.getSnapshot().phase === 'idle') {
-        operation.current = audioResources.acquire({ kind: 'reference', songId, asset });
+        operation.current = audioResources.acquire({ kind: 'reference', songId, asset }, { stream: true });
         const lease = await operation.current.promise;
         if (current !== generation.current) { lease.release(); return; }
         await player.load(lease, seconds, undefined, 0);

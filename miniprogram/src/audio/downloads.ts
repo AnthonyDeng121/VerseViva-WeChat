@@ -49,6 +49,7 @@ export class AudioDownloads {
     download(path: string, access: 'public' | 'private'): Operation<string>;
     remove(path: string): Promise<void>;
     credentials(): Access | null;
+    publicUrl?(path: string): string;
   }) {}
   onReset(callback: () => void) { this.listeners.add(callback); return () => { this.listeners.delete(callback); }; }
   reset() {
@@ -58,24 +59,28 @@ export class AudioDownloads {
     this.pending.clear();
     [...this.releases].forEach((release) => release());
   }
-  acquire(resource: AudioResource): Operation<AudioLease> {
+  acquire(resource: AudioResource, options: { stream?: boolean } = {}): Operation<AudioLease> {
     const generation = this.generation;
     const request = resourceRequest(resource);
+    const streaming = options.stream === true && request.access === 'public' && !!this.dependencies.publicUrl;
     const owner = request.access === 'private' ? this.dependencies.credentials()?.ownerId : null;
     let cancelled = false;
     let operation: Operation<string> | undefined;
     let lease: AudioLease | undefined;
     const promise = (async () => {
       if (request.access === 'private' && !owner) throw new ApiError('authentication', '请先登录后试听自己的录音。');
-      operation = this.dependencies.download(request.path, request.access);
-      this.pending.add(operation);
       let path: string;
-      try { path = await operation.promise; }
-      finally { this.pending.delete(operation); }
+      if (streaming) path = this.dependencies.publicUrl!(request.path);
+      else {
+        operation = this.dependencies.download(request.path, request.access);
+        this.pending.add(operation);
+        try { path = await operation.promise; }
+        finally { this.pending.delete(operation); }
+      }
       const credentials = this.dependencies.credentials();
       if (cancelled || generation !== this.generation
         || (owner && (credentials?.ownerId !== owner || credentials.expiresAtMs <= Date.now()))) {
-        await this.dependencies.remove(path);
+        if (!streaming) await this.dependencies.remove(path);
         throw new ApiError('cancelled', '音频加载已取消，请重新打开。');
       }
       let released = false;
@@ -88,7 +93,7 @@ export class AudioDownloads {
         this.releases.delete(release);
         listeners.forEach((listener) => { try { listener(); } catch { /* Still delete private file. */ } });
         listeners.clear();
-        void this.dependencies.remove(path).catch(() => {});
+        if (!streaming) void this.dependencies.remove(path).catch(() => {});
       };
       if (owner) timer = setTimeout(release, Math.min(2147483647, credentials!.expiresAtMs - Date.now()));
       this.releases.add(release);
